@@ -1,0 +1,1567 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1">
+  <title>Urban3DQuest v4</title>
+  <meta name="theme-color" content="#0f172a">
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <style>
+    /* ── THÈME TERRAIN — dark, outdoor, militaire/GPS ── */
+    *{box-sizing:border-box;margin:0;padding:0}
+    body{font-family:system-ui,sans-serif;background:#0f172a;color:#e2e8f0;height:100dvh;overflow:hidden;display:flex;flex-direction:column;padding-top:env(safe-area-inset-top)}
+    #bgMap{position:fixed;inset:0;z-index:0}
+    /* ── Pseudo screen ── */
+    #pseudoScreen{position:fixed;inset:0;background:linear-gradient(180deg,rgba(15,23,42,.55) 0%,rgba(15,23,42,.75) 100%);z-index:500;display:flex;align-items:center;justify-content:center;padding:24px}
+    .ps-box{width:100%;max-width:360px;text-align:center;background:rgba(15,23,42,.82);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(148,163,184,.18);border-radius:24px;padding:32px 28px;box-shadow:0 8px 48px rgba(0,0,0,.6);animation:slideUp 0.45s cubic-bezier(.16,1,.3,1)}
+    .ps-logo{font-size:2.8rem;margin-bottom:8px}
+    .ps-title{font-size:1.6rem;font-weight:800;letter-spacing:-.02em;background:linear-gradient(135deg,#60a5fa,#a78bfa);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:4px}
+    .ps-sub{font-size:0.9rem;color:#cbd5e1;margin-bottom:28px;line-height:1.6}
+    .ps-box input{width:100%;padding:14px;background:rgba(30,41,59,.9);border:2px solid #334155;border-radius:12px;color:#f1f5f9;font-size:1.1rem;text-align:center;margin-bottom:12px;letter-spacing:.05em}
+    .ps-box input:focus{outline:none;border-color:#3b82f6;box-shadow:0 0 0 3px rgba(59,130,246,.2)}
+    /* ── Bouton principal ── */
+    .btn-main{width:100%;padding:16px;min-height:56px;border:none;border-radius:12px;background:linear-gradient(135deg,#3b82f6,#6366f1);color:#fff;font-size:1.05rem;font-weight:800;cursor:pointer;box-shadow:0 4px 20px rgba(99,102,241,.4);transition:transform 0.1s,opacity 0.2s;letter-spacing:0.02em}
+    .btn-main:active{transform:scale(0.97);opacity:0.9}
+    .btn-main:disabled{opacity:0.5;cursor:default}
+    /* ── Header ── */
+    header{background:#0f172a;padding:10px 14px;display:flex;align-items:center;gap:10px;border-bottom:1px solid #1e293b}
+    header h1{font-size:0.82rem;flex:1;color:#94a3b8;letter-spacing:0.04em;font-weight:700}
+    .pseudo-chip{background:#172554;color:#93c5fd;padding:4px 10px;border-radius:20px;font-size:0.78rem;font-weight:600}
+    /* ── GPS chip — point de statut ── */
+    #gpsChip{display:flex;align-items:center;gap:5px;padding:5px 11px;border-radius:20px;font-size:0.78rem;font-weight:700;background:#1e293b;border:1px solid #334155;color:#94a3b8;cursor:default;transition:all 0.4s}
+    #gpsDot{width:8px;height:8px;border-radius:50%;background:#475569;flex-shrink:0;transition:background 0.4s}
+    #gpsChip.gps-ok{border-color:#16a34a;color:#4ade80;background:rgba(22,163,74,.12)}
+    #gpsChip.gps-ok #gpsDot{background:#4ade80;box-shadow:0 0 6px #22c55e}
+    #gpsChip.gps-mid{border-color:#d97706;color:#fbbf24;background:rgba(217,119,6,.1)}
+    #gpsChip.gps-mid #gpsDot{background:#fbbf24}
+    #gpsChip.gps-bad{border-color:#dc2626;color:#f87171;background:rgba(220,38,38,.15);animation:pulse 0.8s infinite}
+    #gpsChip.gps-bad #gpsDot{background:#f87171}
+    /* ── Navigation ── */
+    nav{display:flex;background:#1e293b;border-bottom:1px solid #334155;padding:0 2px}
+    nav button{flex:1;padding:13px 4px;min-height:52px;background:none;border:none;color:#64748b;font-size:0.8rem;font-weight:700;cursor:pointer;letter-spacing:0.01em;transition:color 0.15s,background 0.15s;display:flex;flex-direction:column;align-items:center;gap:2px}
+    .nav-icon{font-size:1.35rem;line-height:1}
+    .nav-label{font-size:0.7rem;font-weight:700;letter-spacing:.02em}
+    nav button.active{color:#f1f5f9;border-bottom:3px solid #3b82f6;background:rgba(59,130,246,.1);font-weight:800}
+    nav button:active{background:rgba(255,255,255,.06)}
+    /* ── Panels ── */
+    .panel{display:none!important}
+    .panel.active{display:block!important;flex:1;overflow:hidden;min-height:0}
+    #panelExplore.active{display:flex!important;flex-direction:column;flex:1;overflow:hidden;min-height:0}
+    #miniMap{flex:1;border-bottom:2px solid #334155;min-height:0;position:relative}
+    /* ── Radar bar ── */
+    #radarBar{position:fixed;bottom:calc(42px + 12px);left:50%;transform:translateX(-50%);background:rgba(30,41,59,.97);border:1px solid #334155;border-radius:24px;padding:10px 26px;font-size:0.9rem;font-weight:700;color:#94a3b8;z-index:200;display:none;white-space:nowrap;backdrop-filter:blur(8px);box-shadow:0 -4px 24px rgba(0,0,0,.5);letter-spacing:0.01em}
+    #radarBar.near{color:#fbbf24;border-color:#d97706;background:rgba(69,26,3,.97);box-shadow:0 -4px 24px rgba(251,191,36,.25)}
+    #radarBar.very-near{color:#4ade80;border-color:#16a34a;background:rgba(5,46,22,.97);animation:pulse 1s infinite;box-shadow:0 -4px 28px rgba(34,197,94,.35);font-size:0.95rem}
+    /* ── Keyframes ── */
+    @keyframes pulse{0%,100%{opacity:1}50%{opacity:.7}}
+    @keyframes compassSpin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+    @keyframes slideUp{from{transform:translateY(28px);opacity:0}to{transform:translateY(0);opacity:1}}
+    @keyframes foundPop{from{transform:scale(0.82);opacity:0}to{transform:scale(1);opacity:1}}
+    @keyframes bounceIn{0%{transform:scale(0.7);opacity:0}60%{transform:scale(1.08);opacity:1}100%{transform:scale(1)}}
+    @keyframes fadeInFast{from{opacity:0}to{opacity:1}}
+    /* ── Leaflet dark popup ── */
+    .dark-popup .leaflet-popup-content-wrapper{background:#1e293b;color:#e2e8f0;border:1px solid #334155;border-radius:12px;box-shadow:0 4px 24px rgba(0,0,0,.6);padding:4px;font-size:0.9rem}
+    .dark-popup .leaflet-popup-tip{background:#1e293b}
+    .dark-popup .leaflet-popup-close-button{color:#cbd5e1!important;font-size:1.1rem!important;padding:6px 8px!important}
+    /* ── Photo viewer ── */
+    #photoViewer{display:none;position:fixed;inset:0;background:rgba(0,0,0,.92);z-index:9999;align-items:center;justify-content:center;flex-direction:column;padding:16px}
+    #photoViewer.open{display:flex}
+    #photoViewer img{max-width:100%;max-height:80vh;object-fit:contain;border-radius:12px;box-shadow:0 8px 40px rgba(0,0,0,.8)}
+    #photoViewer button{margin-top:18px;padding:14px 36px;background:#1e293b;border:1px solid #334155;border-radius:10px;color:#e2e8f0;font-size:1rem;cursor:pointer;min-height:52px}
+    /* ── Compass panel ── */
+    #compassStatus{text-align:center;font-size:0.78rem;color:#cbd5e1;padding:6px 0 4px}
+    #compassPermBtn{display:none;width:100%;padding:10px 20px;background:linear-gradient(135deg,#3b82f6,#6366f1);border:none;border-radius:12px;color:#fff;font-size:1rem;font-weight:700;cursor:pointer;margin-bottom:14px;min-height:48px}
+    .cmp-card{background:#1e293b;border-radius:16px;padding:16px 14px;margin-bottom:12px;display:flex;align-items:center;gap:14px;border:2px solid #334155;transition:border-color .4s}
+    .cmp-card.in-range{border-color:#22c55e;box-shadow:0 0 20px rgba(34,197,94,.25)}
+    .cmp-arrow-wrap{width:80px;flex-shrink:0;display:flex;align-items:center;justify-content:center}
+    .cmp-arrow-wrap svg{transition:transform .35s ease}
+    .cmp-info{flex:1;min-width:0}
+    .cmp-label{font-weight:700;font-size:1.05rem;margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .cmp-dist{font-size:0.88rem;color:#cbd5e1;margin-bottom:6px}
+    .cmp-hint{font-size:0.8rem;color:#93c5fd;margin-bottom:8px}
+    .cmp-capture{width:100%;padding:10px;background:linear-gradient(135deg,#22c55e,#16a34a);border:none;border-radius:10px;color:#fff;font-weight:800;cursor:pointer;font-size:0.95rem;box-shadow:0 2px 12px rgba(34,197,94,.4);min-height:52px}
+    /* ── Capture FAB ── */
+    #captureFab{position:fixed;bottom:calc(42px + 14px);right:18px;padding:16px 24px;min-height:56px;background:linear-gradient(135deg,#22c55e,#16a34a);border:none;border-radius:16px;font-size:1.05rem;font-weight:800;color:#fff;cursor:pointer;z-index:1000;box-shadow:0 4px 24px rgba(34,197,94,.5);display:none;animation:pulse 1.2s infinite;letter-spacing:0.03em;transition:transform 0.1s}
+    #captureFab:active{transform:scale(0.94)}
+    /* ── Progress bar ── */
+    #progressBar{position:fixed;bottom:0;left:0;right:0;background:#1e293b;border-top:1px solid #334155;padding:8px 16px 12px;z-index:200;display:none;padding-bottom:calc(8px + env(safe-area-inset-bottom))}
+    #progressBar .pb-label{display:flex;justify-content:space-between;font-size:0.78rem;color:#94a3b8;margin-bottom:6px}
+    #progressBar .pb-label strong{color:#f1f5f9;font-size:0.84rem}
+    #progressBar .pb-track{height:12px;background:#0f172a;border-radius:8px;overflow:hidden;border:1px solid #334155}
+    #progressBar .pb-fill{height:100%;background:linear-gradient(90deg,#3b82f6,#6366f1);border-radius:8px;transition:width 0.6s cubic-bezier(.16,1,.3,1);min-width:0}
+    /* ── Leaderboard ── */
+    #panelScores{flex:1;overflow-y:auto;padding:12px 14px 24px;max-width:560px;margin:0 auto;width:100%}
+    .lb-header{text-align:center;padding:14px 0 8px;font-size:0.74rem;color:#cbd5e1;text-transform:uppercase;letter-spacing:.1em}
+    .lb-row{display:flex;align-items:center;gap:10px;padding:13px 16px;background:#1e293b;border-radius:14px;margin-bottom:8px;border:1px solid #334155;transition:transform 0.12s ease}
+    .lb-row:active{transform:translateX(3px)}
+    .lb-row.lb-me{border-color:#3b82f6;background:linear-gradient(135deg,#1e3a5f,#1e293b)}
+    .lb-row.lb-top1{background:linear-gradient(135deg,#2d1f00,#1e293b);border-color:#fbbf24}
+    .lb-row.lb-top2{background:linear-gradient(135deg,#1a1f2e,#1e293b);border-color:#94a3b8}
+    .lb-row.lb-top3{background:linear-gradient(135deg,#1f1208,#1e293b);border-color:#c2855a}
+    .lb-rank{font-size:1.5rem;width:34px;text-align:center;flex-shrink:0}
+    .lb-body{flex:1;min-width:0}
+    .lb-name{font-weight:800;font-size:1rem;color:#f1f5f9;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .lb-me .lb-name::after{content:' 👈';font-weight:400}
+    .lb-score{font-size:0.84rem;color:#cbd5e1;margin-top:2px;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+    .lb-score strong{color:#f1f5f9;font-size:0.88rem}
+    .lb-pbar{height:6px;background:#0f172a;border-radius:4px;overflow:hidden;border:1px solid #334155;margin-top:6px}
+    .lb-pfill{height:100%;border-radius:4px;transition:width 0.5s ease}
+    .lb-badge{display:inline-flex;align-items:center;gap:3px;background:#0f2942;border:1px solid #1d4ed8;border-radius:8px;color:#93c5fd;font-size:0.74rem;padding:3px 8px}
+    .lb-badge-done{background:#14532d;border-color:#16a34a;color:#4ade80}
+    .lb-time{font-size:0.78rem;color:#4ade80;font-weight:700}
+    .lb-sep{height:1px;background:#1e293b;margin:4px 0 10px}
+    .lb-you-sep{text-align:center;font-size:0.7rem;color:#334155;padding:4px 0 2px}
+    .lb-refresh{font-size:0.7rem;color:#334155;text-align:center;padding:10px;margin-top:2px}
+    /* ── Ma carte ── */
+    .my-card{background:linear-gradient(135deg,#1e3a5f,#1a2744);border:2px solid #3b82f6;border-radius:16px;padding:16px 18px;margin-bottom:14px;position:relative}
+    .my-card-rank{position:absolute;top:12px;right:14px;font-size:1.5rem}
+    .my-card-pseudo{font-size:1.05rem;font-weight:800;color:#f1f5f9;margin-bottom:2px}
+    .my-card-sub{font-size:0.78rem;color:#94a3b8;margin-bottom:10px}
+    .my-card-stats{display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+    .my-card-stats strong{font-size:1.1rem;color:#f1f5f9}
+    .my-card-stats span{font-size:0.78rem;color:#cbd5e1}
+    .my-card-bar{height:8px;background:#0f172a;border-radius:4px;overflow:hidden;border:1px solid #1e3a5f}
+    .my-card-fill{height:100%;background:linear-gradient(90deg,#3b82f6,#6366f1);border-radius:4px;transition:width .6s ease}
+    .my-card-done{height:100%;background:linear-gradient(90deg,#22c55e,#16a34a);border-radius:4px}
+    .lb-divider{font-size:0.68rem;color:#475569;text-transform:uppercase;letter-spacing:.1em;text-align:center;padding:6px 0 8px}
+    /* ── Modal trésor trouvé ── */
+    #foundModal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:700;align-items:center;justify-content:center;padding:24px;backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px)}
+    #foundModal.open{display:flex}
+    .found-box{background:#1e293b;border-radius:24px;padding:32px 26px;width:100%;max-width:400px;text-align:center;border:1px solid #334155;animation:foundPop 0.38s cubic-bezier(.34,1.56,.64,1)}
+    .found-box h2{font-size:1.35rem;font-weight:800;margin-bottom:8px}
+    .found-box p{font-size:0.9rem;color:#cbd5e1;margin-bottom:20px;line-height:1.6}
+    .found-box .duration{font-size:1.9rem;font-weight:800;color:#4ade80;margin-bottom:8px}
+    .found-emoji{font-size:3.8rem;margin-bottom:12px;display:block;animation:bounceIn 0.5s cubic-bezier(.34,1.56,.64,1) 0.2s both}
+    /* ── Pause screen ── */
+    #pauseScreen{display:none;position:fixed;inset:0;background:rgba(15,23,42,.97);z-index:800;align-items:center;justify-content:center;text-align:center;flex-direction:column;gap:16px}
+    #pauseScreen.open{display:flex;animation:fadeInFast 0.3s ease}
+    /* ── Boutons carte ── */
+    #arrowToggleBtn{min-height:48px!important;min-width:48px!important;padding:10px 16px!important;font-size:0.8rem!important;font-weight:700!important;transition:transform .1s}
+    #arrowToggleBtn:active{transform:scale(0.9)}
+    #locateMeBtn{min-height:48px!important;min-width:48px!important;padding:10px!important;transition:transform .1s}
+    #locateMeBtn:active{transform:scale(0.9)}
+    /* ── QR Scanner overlay ── */
+    #qrOverlay{display:none;position:fixed;inset:0;background:#0f172a;z-index:2000;flex-direction:column;align-items:center;justify-content:center}
+    #qrOverlay.open{display:flex}
+    #qrCanvas{display:none}
+    #qrUI{display:flex;flex-direction:column;align-items:center;gap:18px;padding:32px 24px calc(32px + env(safe-area-inset-bottom));width:100%;max-width:420px}
+    #qrStatus{color:#f1f5f9;font-size:1rem;font-weight:700;text-align:center;line-height:1.5}
+    #qrStatus.qr-ok{color:#4ade80}
+    #qrStatus.qr-err{color:#f87171}
+    #qrPreviewWrap{width:100%;border-radius:14px;overflow:hidden;display:none;border:2px solid #334155}
+    #qrPreviewImg{width:100%;display:block;max-height:50vh;object-fit:contain;background:#1e293b}
+    #qrPhotoBtn{display:flex;align-items:center;justify-content:center;gap:10px;padding:16px 0;background:linear-gradient(135deg,#2563eb,#4f46e5);border:none;border-radius:14px;color:#fff;font-size:1.05rem;font-weight:800;cursor:pointer;width:100%;min-height:56px;letter-spacing:.02em;box-shadow:0 4px 20px rgba(37,99,235,.4)}
+    #qrCloseBtn{padding:14px 0;background:rgba(30,41,59,.9);border:1px solid #334155;border-radius:12px;color:#f1f5f9;font-size:1rem;font-weight:700;cursor:pointer;min-height:52px;width:100%;backdrop-filter:blur(6px)}
+  </style>
+</head>
+<body>
+
+<!-- ── Background map (landing) ─────────────────────── -->
+<div id="bgMap"></div>
+
+<!-- ── Pseudo screen ────────────────────────────────── -->
+<div id="pseudoScreen">
+  <div class="ps-box">
+    <div class="ps-logo">🏙</div>
+    <div class="ps-title">Urban3DQuest</div>
+    <p class="ps-sub">Chasse au trésor urbaine<br>Entre ton pseudo pour rejoindre</p>
+    <input type="text" id="pseudoInput" placeholder="TON PSEUDO" maxlength="20" autocomplete="off" autocapitalize="characters">
+    <div id="gameCodeWrap" style="display:none;margin-bottom:12px">
+      <input type="text" id="gameCodeInput" placeholder="CODE D'ACCÈS" maxlength="20" autocomplete="off" autocapitalize="characters" style="border-color:#7c3aed;margin-bottom:0">
+    </div>
+    <p id="pseudoErr" style="color:#f87171;font-size:0.78rem;margin-bottom:10px;display:none"></p>
+    <button class="btn-main" id="startBtn" onclick="startGame()">🚀 Rejoindre le jeu</button>
+    <button class="btn-main" id="guestBtn" onclick="continueAsGuest()" style="margin-top:10px;background:#1e293b;border:1px solid #334155">👀 Voir la carte en invité</button>
+  </div>
+</div>
+
+<!-- ── Header ────────────────────────────────────────── -->
+<header>
+  <h1>🏙 Urban3DQuest</h1>
+  <span id="gpsChip" title="Précision GPS">
+    <span id="gpsDot"></span>
+    <span id="gpsLabel">GPS…</span>
+  </span>
+  <span class="pseudo-chip" id="headerPseudo"></span>
+</header>
+<nav>
+  <button id="navExplore" class="active" onclick="showTab('explore',this)"><span class="nav-icon">🗺</span><span class="nav-label">Explorer</span></button>
+  <button id="navScores" onclick="showTab('scores',this)"><span class="nav-icon">🏆</span><span class="nav-label">Scores</span></button>
+</nav>
+
+<!-- ── Explorer (carte + boussole fusionnées) ────────── -->
+<div id="panelExplore" class="panel active">
+  <div id="miniMap" style="position:relative">
+    <button id="arrowToggleBtn" onclick="toggleCompassArrows()" style="position:absolute;bottom:14px;right:10px;z-index:1000;background:rgba(30,58,138,.88);border:2px solid #3b82f6;border-radius:12px;color:#93c5fd;font-size:0.75rem;font-weight:700;padding:7px 12px;cursor:pointer;backdrop-filter:blur(6px)">📌 Balises fixes</button>
+    <button id="locateMeBtn" onclick="recenterMap()" style="position:absolute;bottom:14px;left:10px;z-index:1000;background:rgba(15,23,42,.88);border:2px solid #334155;border-radius:12px;color:#94a3b8;font-size:1.1rem;padding:7px 11px;cursor:pointer;backdrop-filter:blur(6px);display:none" title="Recentrer sur ma position"><svg width="20" height="20" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block"><circle cx="10" cy="10" r="7" stroke="currentColor" stroke-width="1.8"/><circle cx="10" cy="10" r="2.5" fill="currentColor"/><line x1="10" y1="1" x2="10" y2="4.5" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="10" y1="15.5" x2="10" y2="19" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="1" y1="10" x2="4.5" y2="10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><line x1="15.5" y1="10" x2="19" y2="10" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></svg></button>
+    <button id="compassPermBtn" onclick="requestCompassPermission()" style="display:none;position:absolute;top:10px;left:50%;transform:translateX(-50%);z-index:1000;padding:8px 16px;background:linear-gradient(135deg,#3b82f6,#6366f1);border:none;border-radius:12px;color:#fff;font-size:0.82rem;font-weight:700;cursor:pointer;backdrop-filter:blur(6px)">🧭 Activer le compas (iOS)</button>
+    <div id="compassDebug" style="display:none;position:absolute;top:10px;left:10px;z-index:1000;font-size:0.68rem;color:#94a3b8;line-height:1.6;padding:8px 12px;background:rgba(15,23,42,.9);border-radius:8px;max-width:220px"></div>
+  </div>
+</div>
+
+<!-- ── Photo viewer overlay ──────────────────────────── -->
+<div id="photoViewer" onclick="closePhotoViewer()">
+  <img id="photoViewerImg" src="" alt="photo">
+  <button onclick="closePhotoViewer()">✕ Fermer</button>
+</div>
+
+<!-- ── Leaderboard ───────────────────────────────────── -->
+<div id="panelScores" class="panel">
+  <div id="myCard"></div>
+  <div id="lbList"><p style="color:#475569;text-align:center;padding:40px">Chargement…</p></div>
+  <div class="lb-refresh" id="lbRefresh"></div>
+</div>
+
+<!-- ── Radar bar ─────────────────────────────────────── -->
+<div id="radarBar"></div>
+
+<!-- ── Capture FAB (balises fixes GPS) ──────────────── -->
+<button id="captureFab" onclick="captureFixed()">📸 Capturer !</button>
+
+<!-- ── Progress bar ──────────────────────────────────── -->
+<div id="progressBar">
+  <div class="pb-label">
+    <span>🎯 Balises fixes trouvées</span>
+    <strong id="pbCount">0 / 5</strong>
+  </div>
+  <div class="pb-track"><div class="pb-fill" id="pbFill" style="width:0%"></div></div>
+</div>
+
+<!-- ── Found modal ───────────────────────────────────── -->
+<div id="foundModal">
+  <div class="found-box">
+    <img id="foundPhoto" style="width:100%;max-height:180px;object-fit:cover;border-radius:12px;margin-bottom:12px;display:none">
+    <div id="foundPhotoStrip" style="display:none;margin-bottom:12px"></div>
+    <div class="found-emoji" id="foundEmoji">🎉</div>
+    <h2 id="foundTitle">Trésor trouvé !</h2>
+    <div class="duration" id="foundDuration"></div>
+    <p id="foundDesc"></p>
+    <button class="btn-main" onclick="closeFound()">✅ Continuer</button>
+  </div>
+</div>
+
+<!-- ── QR Scanner overlay ──────────────────────────── -->
+<div id="qrOverlay">
+  <canvas id="qrCanvas"></canvas>
+  <div id="qrUI">
+    <div style="font-size:2.5rem">📷</div>
+    <div id="qrStatus">Prends une photo du QR code pour valider la balise</div>
+    <div id="qrPreviewWrap"><img id="qrPreviewImg" alt="preview"></div>
+    <label id="qrPhotoBtn">
+      📷 Prendre une photo
+      <input type="file" accept="image/*" capture="environment" id="qrFileInput" style="display:none">
+    </label>
+    <div id="qrTips" style="font-size:0.86rem;color:#94a3b8;display:none;max-width:380px;text-align:center">Astuce: rapproche-toi du QR, évite les reflets et assure-toi qu'il occupe une bonne part de l'image.</div>
+    <button id="qrCloseBtn" onclick="closeQRScanner()">✕ Annuler</button>
+  </div>
+</div>
+
+<!-- ── Pause screen ──────────────────────────────────── -->
+<div id="pauseScreen">
+  <div style="font-size:3rem">⏸</div>
+  <h2>Jeu en pause</h2>
+  <p style="color:#64748b;font-size:0.85rem">L'organisateur a mis le jeu en pause.<br>Patiente…</p>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+
+<script>
+// ⚠️ STAGING — remplace ces valeurs par celles de ton projet Supabase staging
+const SUPABASE_URL = 'https://STAGING_PROJECT_ID.supabase.co';
+const SUPABASE_KEY = 'STAGING_ANON_KEY';
+
+const { createClient } = supabase;
+const db = createClient(SUPABASE_URL, SUPABASE_KEY);
+
+let myPseudo     = localStorage.getItem('u3dq_pseudo') || '';
+let myScore      = 0;
+let myFoundCount = 0;
+let gameMap      = null;
+let treasures    = [];
+let mapMarkers   = {};
+let proximityR   = 100;
+let fixedTotal   = 5;   // total fixed beacons, overridden by config key 'fixedTotal'
+let modeMap      = true;  // show map tab
+let modeCompass  = true;  // show compass tab
+let activeTab    = 'explore';
+let deviceHeading = null; // degrees clockwise from north (from device sensor)
+let compassInterval = null;
+let mapCenter    = [45.1885, 5.7245]; // default Grenoble, overridden by config
+let activeQuests = [];  // empty = all quests visible
+let gameStart    = null;  // Date or null — reference timestamp for score calc
+let gameCode     = '';    // empty = open access
+let playerLat    = null, playerLng = null;
+let playerAccuracy = null; // GPS accuracy in meters
+let gpsHistory   = []; // last N positions for smoothing
+let nearestFixed = null;
+let lbInterval   = null;
+let geoWatch     = null;
+let lastHapticZone = null;
+let directionLayers = []; // arrow markers on minimap
+let compassArrowMode = true; // toggle: show direction arrows on minimap
+let mapFollowing = true; // true = map follows GPS, false = user is panning freely
+let lastArrowLat = null, lastArrowLng = null, lastArrowHeading = null; // throttle
+
+// ── Startup ──────────────────────────────────────────
+let bgMap = null;
+
+window.addEventListener('load', async () => {
+  // Attach QR file input handler (cloneNode approach requires JS init)
+  const qrInput = document.getElementById('qrFileInput');
+  if (qrInput) qrInput.addEventListener('change', () => handleQRPhoto(qrInput));
+
+  // Pre-fetch config to get mapCenter + gameCode for landing screen
+  const { data: cfgData } = await db.from('config').select('key,value').in('key',['mapCenter','gameCode']);
+  if (cfgData) {
+    const cMap = Object.fromEntries(cfgData.map(r => [r.key, r.value]));
+    if (cMap.mapCenter) {
+      const parts = cMap.mapCenter.split(',').map(Number);
+      if (parts.length === 2 && !isNaN(parts[0])) mapCenter = parts;
+    }
+    if (cMap.gameCode) {
+      gameCode = cMap.gameCode;
+      document.getElementById('gameCodeWrap').style.display = 'block';
+    }
+  }
+
+  const params    = new URLSearchParams(location.search);
+  const foundId   = params.get('found');
+  const checkinId = params.get('checkin') || '';   // ID de la balise fixe (ou '1' legacy)
+  const checkin   = !!checkinId;
+
+  // QR balise scanné par un non-joueur → carte de visite
+  if (checkin && !myPseudo) {
+    window.location.replace('https://jadikan.carrd.co/');
+    return;
+  }
+
+  // Returning user: skip landing + bgMap entirely
+  if (myPseudo) {
+    document.getElementById('pseudoScreen').style.display = 'none';
+    document.getElementById('bgMap').style.display = 'none';
+    if (checkin) sessionStorage.setItem('pendingCheckin', checkinId);
+    initGame(foundId);
+    return;
+  }
+
+  // New user: show animated landing with bgMap
+  if (foundId) sessionStorage.setItem('pendingFound', foundId);
+  if (checkin) sessionStorage.setItem('pendingCheckin', checkinId);
+
+  bgMap = L.map('bgMap', { zoomControl: false, attributionControl: false, dragging: false, scrollWheelZoom: false, touchZoom: false, doubleClickZoom: false, keyboard: false });
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(bgMap);
+  bgMap.setView(mapCenter, 14);
+  if (navigator.geolocation) {
+    navigator.geolocation.getCurrentPosition(pos => {
+      bgMap && bgMap.setView([pos.coords.latitude, pos.coords.longitude], 15);
+    }, () => {}, { timeout: 5000 });
+  }
+});
+
+function hideLanding() {
+  document.getElementById('pseudoScreen').style.display = 'none';
+  if (bgMap) { bgMap.remove(); bgMap = null; }
+  document.getElementById('bgMap').style.display = 'none';
+}
+
+// ── Register & start ─────────────────────────────────
+async function startGame() {
+  const input = document.getElementById('pseudoInput');
+  const err   = document.getElementById('pseudoErr');
+  const pseudo = input.value.trim().toUpperCase().replace(/[^A-Z0-9_\-]/g, '');
+
+  if (pseudo.length < 2) { err.textContent = 'Pseudo trop court (min 2 caractères)'; err.style.display = 'block'; return; }
+
+  // Check game code if required
+  if (gameCode) {
+    const entered = (document.getElementById('gameCodeInput').value || '').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+    if (entered !== gameCode) { err.textContent = 'Code d\'accès incorrect.'; err.style.display = 'block'; return; }
+  }
+  err.style.display = 'none';
+
+  document.getElementById('startBtn').disabled = true;
+  document.getElementById('startBtn').textContent = '⏳ Connexion…';
+
+  // Check/insert player
+  const { data: existing } = await db.from('players').select('pseudo,score,found_count').eq('pseudo', pseudo).single();
+  if (!existing) {
+    const { error } = await db.from('players').insert({ pseudo, joined_at: new Date().toISOString(), score: 0, found_count: 0 });
+    if (error && error.code !== '23505') {
+      err.textContent = 'Erreur réseau : ' + error.message;
+      err.style.display = 'block';
+      document.getElementById('startBtn').disabled = false;
+      document.getElementById('startBtn').textContent = '🚀 Rejoindre le jeu';
+      return;
+    }
+  } else {
+    myScore      = existing.score      || 0;
+    myFoundCount = existing.found_count || 0;
+  }
+
+  myPseudo = pseudo;
+  localStorage.setItem('u3dq_pseudo', pseudo);
+  hideLanding();
+
+  const pending = sessionStorage.getItem('pendingFound');
+  sessionStorage.removeItem('pendingFound');
+  initGame(pending);
+}
+
+async function continueAsGuest() {
+  const err = document.getElementById('pseudoErr');
+  // Keep access-code protection if configured, even for guest browsing.
+  if (gameCode) {
+    const entered = (document.getElementById('gameCodeInput').value || '').trim().toUpperCase().replace(/[^A-Z0-9]/g,'');
+    if (entered !== gameCode) { err.textContent = 'Code d\'accès incorrect.'; err.style.display = 'block'; return; }
+  }
+  err.style.display = 'none';
+  hideLanding();
+  sessionStorage.removeItem('pendingFound');
+  sessionStorage.removeItem('pendingCheckin');
+  history.replaceState({}, '', location.pathname);
+  initGame(null);
+}
+
+// ── Init game ────────────────────────────────────────
+async function initGame(pendingFoundId) {
+  updateHeader();
+  document.getElementById('radarBar').style.display = 'block';
+
+  // Load config
+  const { data: cfg } = await db.from('config').select('*');
+  if (cfg) {
+    const c = Object.fromEntries(cfg.map(r => [r.key, r.value]));
+    if (c.proximityRadius) proximityR = Number(c.proximityRadius);
+    if (c.fixedTotal)      fixedTotal  = Number(c.fixedTotal);
+    if (c.modeMap !== undefined)     modeMap     = c.modeMap !== 'false';
+    if (c.modeCompass !== undefined) modeCompass = c.modeCompass !== 'false';
+    if (c.gameActive === 'false') showPause();
+    if (c.activeQuests) { try { activeQuests = JSON.parse(c.activeQuests); } catch(e) { activeQuests = []; } }
+    else if (c.activeQuest) { activeQuests = c.activeQuest ? [c.activeQuest] : []; }
+    if (c.mapCenter) {
+      const parts = c.mapCenter.split(',').map(Number);
+      if (parts.length === 2 && !isNaN(parts[0])) mapCenter = parts;
+    }
+    if (c.gameStart) {
+      const gs = new Date(c.gameStart);
+      if (!isNaN(gs.getTime())) gameStart = gs;
+    }
+  }
+
+  // Load treasures & init map
+  await loadTreasures();
+  initMap();
+  startCompassInterval();
+
+  // Start orientation sensor (Android = no permission; iOS = button shown)
+  startOrientationWatch();
+
+  startGeoWatch();
+  startLbPolling();
+  updateProgressBar();
+
+  // Clean URL & process pending QR
+  if (pendingFoundId) {
+    history.replaceState({}, '', location.pathname);
+    await processFindById(pendingFoundId);
+  }
+
+  // Process QR balise checkin
+  if (sessionStorage.getItem('pendingCheckin')) {
+    const cid = sessionStorage.getItem('pendingCheckin');
+    sessionStorage.removeItem('pendingCheckin');
+    sessionStorage.setItem('_checkinTargetId', cid);
+    history.replaceState({}, '', location.pathname);
+    processCheckin();
+  }
+}
+
+// ── QR balise checkin ────────────────────────────────
+function processCheckin() {
+  if (playerLat === null) {
+    let waited = 0;
+    const poll = setInterval(() => {
+      waited += 500;
+      if (playerLat !== null) { clearInterval(poll); _doCheckin(); }
+      else if (waited >= 10000) { clearInterval(poll); _checkinError('GPS indisponible — active la localisation et réessaie.'); }
+    }, 500);
+  } else {
+    _doCheckin();
+  }
+}
+
+function _doCheckin() {
+  const targetId = sessionStorage.getItem('_checkinTargetId') || '';
+  sessionStorage.removeItem('_checkinTargetId');
+
+  // Cas 1 : ID spécifique (QR par balise)
+  if (targetId && targetId !== '1') {
+    const t = treasures.find(t => t.id === targetId);
+    if (!t) { _checkinError('Balise introuvable — elle a peut-être été retirée.'); return; }
+    if (t.found_by && t.found_by.split(',').includes(myPseudo)) {
+      _checkinError('Tu as déjà validé cette balise ! 📌'); return;
+    }
+    const dist = haversine(playerLat, playerLng, t.lat, t.lng);
+    if (dist > proximityR) {
+      _checkinError(`Tu es à ${Math.round(dist)}m de "${tLabel(t)}" — trop loin pour valider.\nApproche-toi à moins de ${proximityR}m.`);
+      return;
+    }
+    processFindById(t.id);
+    return;
+  }
+
+  // Cas 2 : QR générique legacy (checkin=1) → balise la plus proche
+  const candidates = treasures.filter(t => {
+    if (t.type !== 'fixed') return false;
+    if (t.found_by && t.found_by.split(',').includes(myPseudo)) return false;
+    return true;
+  });
+  if (!candidates.length) { _checkinError('Tu as déjà trouvé toutes les balises fixes ! 🏆'); return; }
+  const nearest = candidates
+    .map(t => ({ ...t, dist: haversine(playerLat, playerLng, t.lat, t.lng) }))
+    .sort((a, b) => a.dist - b.dist)[0];
+  if (nearest.dist > proximityR) {
+    _checkinError(`Tu es à ${Math.round(nearest.dist)}m — trop loin pour valider.\nApproche-toi à moins de ${proximityR}m.`);
+    return;
+  }
+  processFindById(nearest.id);
+}
+
+function _checkinError(msg) {
+  document.getElementById('foundEmoji').textContent = '📍';
+  document.getElementById('foundTitle').textContent = 'QR scanné !';
+  document.getElementById('foundDuration').textContent = '';
+  document.getElementById('foundDesc').textContent = msg;
+  document.getElementById('foundPhotoStrip').style.display = 'none';
+  document.getElementById('foundPhoto').style.display = 'none';
+  document.getElementById('foundModal').classList.add('open');
+}
+
+function updateHeader() {
+  const chip = document.getElementById('headerPseudo');
+  if (chip) chip.textContent = myPseudo || '';
+}
+
+// ── Treasures ────────────────────────────────────────
+async function loadTreasures() {
+  const { data, error } = await db.from('treasures')
+    .select('id,type,lat,lng,label,hint,visible,photo_url,found_by,placed_at,quest')
+    .eq('visible', true);
+  if (error) {
+    console.error('loadTreasures error:', error.message);
+    const bar = document.getElementById('radarBar');
+    if (bar && !treasures.length) { bar.textContent = '⚠️ Erreur réseau — vérifie ta connexion'; bar.className = ''; }
+    return;
+  }
+  if (!data) return;
+  // Filter client-side: if no active quest, show all. Otherwise show matching quest + no-quest (null or '')
+  if (activeQuests.length) {
+    treasures = data.filter(t => !t.quest || activeQuests.includes(t.quest));
+  } else {
+    treasures = data;
+  }
+}
+
+// ── Map ──────────────────────────────────────────────
+function initMap() {
+  gameMap = L.map('miniMap', { zoomControl: false, attributionControl: false }).setView(mapCenter, 13);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    keepBuffer: 6,           // preload 6 tiles beyond the viewport in every direction
+    updateWhenIdle: false,   // load tiles while panning, not just after stopping
+    updateWhenZooming: false // load during pinch-zoom too
+  }).addTo(gameMap);
+  gameMap.on('dragstart', function() {
+    mapFollowing = false;
+    var btn = document.getElementById('locateMeBtn');
+    if (btn) btn.style.display = 'block';
+  });
+  renderMarkers();
+}
+
+function getPhotoUrls(raw){if(!raw)return[];if(raw.charAt(0)==='['){try{return JSON.parse(raw).filter(Boolean);}catch(e){}}return[raw];}
+
+function escHtml(v){
+  return String(v ?? '')
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function safeImgUrl(v) {
+  const s = String(v || '').trim();
+  if (!s) return '';
+  if (/^(https?:|data:image\/)/i.test(s)) return s;
+  return '';
+}
+
+function jsSingleQuoted(v) {
+  return String(v ?? '').replace(/\\/g, '\\\\').replace(/'/g, "\\'");
+}
+
+function renderMarkers() {
+  Object.values(mapMarkers).forEach(m => gameMap.removeLayer(m));
+  mapMarkers = {};
+
+  treasures.forEach(t => {
+    const isMine  = t.found_by && t.found_by.split(',').includes(myPseudo);
+    // Fixed beacons are hidden on the map unless already found by this player
+    if (t.type === 'fixed' && !isMine) return;
+    const isTaken = t.type === 'unique' && t.found_by && t.found_by.length > 0;
+    const color   = isMine ? '#4ade80' : isTaken ? '#475569' : (t.type === 'unique' ? '#c084fc' : '#60a5fa');
+    const opacity = isTaken && !isMine ? 0.4 : 1;
+
+    const popup = isTaken && !isMine
+      ? `<b>${escHtml(tLabel(t))}</b><br>🔒 Déjà récupéré`
+      : (() => {
+          const urls = getPhotoUrls(t.photo_url);
+          const safeUrls = urls.map(safeImgUrl).filter(Boolean);
+          const ph = safeUrls.map(u =>
+            `<img src="${escHtml(u)}" onclick="openPhotoViewer('${jsSingleQuoted(u)}')" style="width:100%;max-height:180px;object-fit:cover;border-radius:8px;margin-bottom:6px;display:block;cursor:zoom-in">`
+          ).join('');
+          return `<div style="min-width:220px">${ph}<b style="font-size:0.95rem">${escHtml(tLabel(t))}</b><br><span style="font-size:0.82em;color:#888">${t.type === 'fixed' ? '📌 Balise fixe' : '🎁 Balise unique'}</span>${t.hint ? `<br><span style="font-size:0.82em;color:#93c5fd">💡 ${escHtml(t.hint)}</span>` : ''}${safeUrls.length ? `<br><span style="font-size:0.75em;color:#64748b">👆 Tap photo pour agrandir</span>` : ''}</div>`;
+        })();
+
+    // Unique treasures not yet found: fuzzy circle — center is randomly OFFSET from
+    // the real location (deterministic per treasure ID), so zooming in never reveals
+    // the exact spot. The treasure is somewhere inside the circle, not at the center.
+    if (t.type === 'unique' && !isMine) {
+      // Deterministic pseudo-random offset from treasure ID (same result every render)
+      let seed = 0;
+      for (let i = 0; i < t.id.length; i++) seed = (seed * 31 + t.id.charCodeAt(i)) & 0xffffffff;
+      const angle  = (seed % 628) / 100; // 0 to 2π
+      const dist   = 40 + (Math.abs(seed >> 8) % 40); // 40–80m offset
+      const mPerLat = 111320;
+      const mPerLng = 111320 * Math.cos(t.lat * Math.PI / 180);
+      const fuzzLat = t.lat + (dist * Math.sin(angle)) / mPerLat;
+      const fuzzLng = t.lng + (dist * Math.cos(angle)) / mPerLng;
+      const c = L.circle([fuzzLat, fuzzLng], {
+        radius: 90, color, fillColor: color,
+        fillOpacity: 0.18 * opacity, weight: 2, opacity: 0.75 * opacity
+      }).addTo(gameMap).bindPopup(popup, { maxWidth: 280, className: 'dark-popup' });
+      mapMarkers[t.id] = c;
+      return;
+    }
+
+    // All other cases (found uniques, found fixed): simple dot
+    const icon = L.divIcon({
+      html: `<div style="background:${color};width:16px;height:16px;border-radius:50%;border:2px solid #fff;box-shadow:0 2px 8px rgba(0,0,0,.5);opacity:${opacity}"></div>`,
+      className: '', iconSize: [16, 16], iconAnchor: [8, 8]
+    });
+    mapMarkers[t.id] = L.marker([t.lat, t.lng], { icon }).addTo(gameMap).bindPopup(popup, { maxWidth: 280, className: 'dark-popup' });
+  });
+}
+function startGeoWatch() {
+  if (!navigator.geolocation) {
+    document.getElementById('radarBar').textContent = '📍 GPS non disponible sur cet appareil';
+    return;
+  }
+  let playerMarker = null;
+  let accuracyCircle = null;
+  geoWatch = navigator.geolocation.watchPosition(pos => {
+    // Smooth GPS: keep last 5 positions, weighted average
+    gpsHistory.push({ lat: pos.coords.latitude, lng: pos.coords.longitude, acc: pos.coords.accuracy });
+    if (gpsHistory.length > 5) gpsHistory.shift();
+    const weights = [1, 2, 3, 4, 5].slice(gpsHistory.length > 5 ? 0 : 5 - gpsHistory.length);
+    const totalW = weights.reduce((a,b) => a+b, 0);
+    playerLat = gpsHistory.reduce((s, p, i) => s + p.lat * weights[i], 0) / totalW;
+    playerLng = gpsHistory.reduce((s, p, i) => s + p.lng * weights[i], 0) / totalW;
+    playerAccuracy = pos.coords.accuracy;
+
+    // Update GPS chip in header
+    const chip = document.getElementById('gpsChip');
+    const lbl  = document.getElementById('gpsLabel');
+    const acc  = Math.round(playerAccuracy);
+    if (chip && lbl) {
+      lbl.textContent = `±${acc}m`;
+      chip.className = acc <= 15 ? 'gps-ok' : acc <= 40 ? 'gps-mid' : 'gps-bad';
+      chip.title = acc <= 15 ? `GPS précis (±${acc}m)` : acc <= 40 ? `GPS moyen (±${acc}m) — reste à l'air libre` : `GPS faible (±${acc}m) — éloigne-toi des bâtiments`;
+    }
+
+    if (gameMap) {
+      const pos2 = [playerLat, playerLng];
+      // Accuracy circle
+      const circleColor = acc <= 15 ? '#22c55e' : acc <= 40 ? '#f59e0b' : '#ef4444';
+      if (!accuracyCircle) {
+        accuracyCircle = L.circle(pos2, { radius: playerAccuracy, color: circleColor, fillColor: circleColor, fillOpacity: 0.08, weight: 1.5, opacity: 0.4 }).addTo(gameMap);
+      } else {
+        accuracyCircle.setLatLng(pos2).setRadius(playerAccuracy).setStyle({ color: circleColor, fillColor: circleColor });
+      }
+      // Player marker
+      if (!playerMarker) {
+        const icon = L.divIcon({
+          html: `<div style="background:#f59e0b;width:12px;height:12px;border-radius:50%;border:2px solid #fff;box-shadow:0 0 0 4px rgba(245,158,11,.3)"></div>`,
+          className: '', iconSize: [12, 12], iconAnchor: [6, 6]
+        });
+        playerMarker = L.marker(pos2, { icon, zIndexOffset: 1000 }).addTo(gameMap);
+      } else {
+        playerMarker.setLatLng(pos2);
+      }
+      // Follow player on map only when on explore tab and not manually panning
+      if (activeTab === 'explore' && mapFollowing) {
+        gameMap.setView(pos2, gameMap.getZoom(), { animate: true });
+      }
+    }
+
+    updateRadar();
+  }, err => {
+    const msgs = { 1: 'Permission GPS refusée — active la localisation dans les réglages', 2: 'GPS indisponible', 3: 'Délai GPS dépassé — reste à l\'air libre' };
+    const bar = document.getElementById('radarBar');
+    bar.textContent = '📍 ' + (msgs[err.code] || 'Erreur GPS');
+    bar.className = '';
+    const chip = document.getElementById('gpsChip');
+    const lbl  = document.getElementById('gpsLabel');
+    if (chip && lbl) { lbl.textContent = 'off'; chip.className = 'gps-bad'; }
+  }, { enableHighAccuracy: true, maximumAge: 5000 });
+}
+
+function recenterMap() {
+  if (!gameMap || playerLat === null) return;
+  mapFollowing = true;
+  gameMap.setView([playerLat, playerLng], gameMap.getZoom(), { animate: true });
+  var btn = document.getElementById('locateMeBtn');
+  if (btn) btn.style.display = 'none';
+}
+
+function haversine(lat1, lng1, lat2, lng2) {
+  const R = 6371000, toRad = x => x * Math.PI / 180;
+  const dLat = toRad(lat2 - lat1), dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat/2)**2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng/2)**2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+// Returns a point at given distance (meters) and bearing (degrees) from lat/lng
+function destinationPoint(lat, lng, bearing, distM) {
+  const R = 6371000, d = distM / R, b = bearing * Math.PI / 180;
+  const lat1 = lat * Math.PI / 180, lng1 = lng * Math.PI / 180;
+  const lat2 = Math.asin(Math.sin(lat1)*Math.cos(d) + Math.cos(lat1)*Math.sin(d)*Math.cos(b));
+  const lng2 = lng1 + Math.atan2(Math.sin(b)*Math.sin(d)*Math.cos(lat1), Math.cos(d)-Math.sin(lat1)*Math.sin(lat2));
+  return [lat2 * 180/Math.PI, lng2 * 180/Math.PI];
+}
+
+// Human-readable label for a treasure (never shows raw ID or generic "sans nom")
+function tLabel(t) {
+  if (t.label && t.label.trim()) return t.label.trim();
+  return t.type === 'fixed' ? '📌 Balise fixe' : '🎁 Trésor unique';
+}
+
+function distLabel(d) {
+  if (d < 10)   return 'moins de 10m';
+  if (d < 50)   return 'moins de 50m';
+  if (d < 100)  return 'moins de 100m';
+  if (d < 200)  return 'moins de 200m';
+  if (d < 500)  return 'moins de 500m';
+  if (d < 1000) return 'moins de 1km';
+  return 'environ ' + (d / 1000).toFixed(1) + 'km';
+}
+
+function haptic(pattern) {
+  if (navigator.vibrate) navigator.vibrate(pattern);
+}
+
+function updateRadar() {
+  if (playerLat === null) return;
+  const bar = document.getElementById('radarBar');
+  const fab = document.getElementById('captureFab');
+
+  if (!myPseudo) {
+    bar.textContent = '👀 Mode invité — exploration carte uniquement';
+    bar.className = '';
+    fab.style.display = 'none';
+    nearestFixed = null;
+    lastHapticZone = null;
+    return;
+  }
+
+  // GPS accuracy warning
+  const accStr = playerAccuracy ? ` · GPS ±${Math.round(playerAccuracy)}m` : '';
+  const gpsWeak = playerAccuracy && playerAccuracy > 40;
+
+  const candidates = treasures.filter(t => {
+    if (t.type === 'unique' && t.found_by && t.found_by.length > 0) return false; // already taken
+    if (t.found_by && t.found_by.split(',').includes(myPseudo)) return false; // already found by me
+    return true;
+  });
+
+  if (!candidates.length) {
+    bar.textContent = '✅ Tous les trésors trouvés !';
+    bar.className = '';
+    fab.style.display = 'none';
+    nearestFixed = null;
+    lastHapticZone = null;
+    return;
+  }
+
+  // Separate nearest fixed vs nearest unique
+  let nearestF = null, minDistF = Infinity;
+  let nearestU = null, minDistU = Infinity;
+  candidates.forEach(t => {
+    const d = haversine(playerLat, playerLng, t.lat, t.lng);
+    if (t.type === 'fixed'  && d < minDistF) { minDistF = d; nearestF = t; }
+    if (t.type === 'unique' && d < minDistU) { minDistU = d; nearestU = t; }
+  });
+
+  // Radar bar is driven by nearest FIXED only
+  // Unique beacons are visible on map — no distance hint needed
+  if (!nearestF) {
+    // No fixed left — check unique only for "à portée" QR prompt
+    if (nearestU && Math.round(minDistU) <= proximityR) {
+      bar.textContent = `🎁 Balise unique à portée — scanne le QR !${accStr}`;
+      bar.className = 'very-near';
+      if (lastHapticZone !== 'capture') { lastHapticZone = 'capture'; haptic([100, 50, 100, 50, 200]); }
+    } else {
+      bar.textContent = nearestU ? `🎁 Balises uniques visibles sur la carte${accStr}` : '✅ Tous les trésors trouvés !';
+      bar.className = '';
+    }
+    fab.style.display = 'none';
+    nearestFixed = null;
+    return;
+  }
+
+  const dist = Math.round(minDistF);
+  const label = distLabel(dist);
+
+  if (dist > proximityR * 5) {
+    bar.textContent = `🧭 📌 Balise fixe : ${label}${accStr}`;
+    bar.className = gpsWeak ? 'near' : '';
+    fab.style.display = 'none';
+    nearestFixed = null;
+    if (lastHapticZone !== 'far') { lastHapticZone = 'far'; }
+  } else if (dist > proximityR) {
+    bar.textContent = `🔥 Tu approches ! ${label}${accStr}`;
+    bar.className = 'near';
+    fab.style.display = 'none';
+    nearestFixed = null;
+    if (lastHapticZone !== 'near') { lastHapticZone = 'near'; haptic([80, 60, 80]); }
+  } else {
+    const canCapture = !gpsWeak || playerAccuracy < proximityR * 1.5;
+    bar.textContent = `📌 Balise fixe à portée !${gpsWeak ? ' ⚠️ GPS faible' : ''}${accStr}`;
+    bar.className = 'very-near';
+    nearestFixed = canCapture ? nearestF : null;
+    fab.style.display = (activeTab === 'explore' && canCapture) ? 'block' : 'none';
+    if (lastHapticZone !== 'capture') { lastHapticZone = 'capture'; haptic([100, 50, 100, 50, 200]); }
+  }
+}
+
+async function captureFixed() {
+  if (!myPseudo) { _checkinError('Mode invité: connecte-toi pour capturer une balise.'); return; }
+  if (!nearestFixed) return;
+  haptic([50, 30, 50]);
+  openQRScanner(nearestFixed.id);
+}
+
+// ── Compass orientation ───────────────────────────────
+function bearingTo(lat1, lng1, lat2, lng2) {
+  const dLng = (lng2 - lng1) * Math.PI / 180;
+  const lat1r = lat1 * Math.PI / 180, lat2r = lat2 * Math.PI / 180;
+  const y = Math.sin(dLng) * Math.cos(lat2r);
+  const x = Math.cos(lat1r) * Math.sin(lat2r) - Math.sin(lat1r) * Math.cos(lat2r) * Math.cos(dLng);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+}
+
+function startOrientationWatch() {
+  // iOS 13+: needs explicit permission via button tap
+  if (typeof DeviceOrientationEvent !== 'undefined' &&
+      typeof DeviceOrientationEvent.requestPermission === 'function') {
+    document.getElementById('compassPermBtn').style.display = 'block';
+    return;
+  }
+  _attachOrientationListeners();
+}
+
+async function requestCompassPermission() {
+  try {
+    const res = await DeviceOrientationEvent.requestPermission();
+    if (res === 'granted') {
+      document.getElementById('compassPermBtn').style.display = 'none';
+      _attachOrientationListeners();
+    } else {
+      document.getElementById('compassPermBtn').textContent = '⚠️ Compas refusé — flèches statiques';
+    }
+  } catch(e) {
+    document.getElementById('compassPermBtn').textContent = '⚠️ Erreur compas';
+  }
+}
+
+function _attachOrientationListeners() {
+  let hasAbsolute = false;
+
+  // Prefer deviceorientationabsolute (Android Chrome 67+) — true north
+  window.addEventListener('deviceorientationabsolute', e => {
+    if (e.alpha !== null && e.alpha !== undefined) {
+      hasAbsolute = true;
+      // alpha = rotation around Z axis, clockwise from north on Android
+      // Need to negate for clockwise compass heading
+      deviceHeading = (360 - e.alpha) % 360;
+    }
+  }, true);
+
+  // Fallback: standard deviceorientation
+  window.addEventListener('deviceorientation', e => {
+    // iOS: webkitCompassHeading is directly clockwise from north
+    if (typeof e.webkitCompassHeading === 'number' && e.webkitCompassHeading >= 0) {
+      deviceHeading = e.webkitCompassHeading;
+      return;
+    }
+    // Android fallback if absolute didn't fire
+    if (!hasAbsolute && e.alpha !== null && e.alpha !== undefined) {
+      deviceHeading = (360 - e.alpha) % 360;
+    }
+  }, true);
+}
+
+
+function updateProgressBar() {
+  const bar = document.getElementById('progressBar');
+  if (!myPseudo) { bar.style.display = 'none'; return; }
+  bar.style.display = 'block';
+  const myFixedFound = treasures.filter(t =>
+    t.type === 'fixed' &&
+    t.found_by && t.found_by.split(',').includes(myPseudo)
+  ).length;
+  const pct = fixedTotal > 0 ? Math.min(100, Math.round(myFixedFound / fixedTotal * 100)) : 0;
+  document.getElementById('pbCount').textContent = myFixedFound + ' / ' + fixedTotal;
+  document.getElementById('pbFill').style.width = pct + '%';
+  // Color: green when complete
+  document.getElementById('pbFill').style.background =
+    myFixedFound >= fixedTotal
+      ? 'linear-gradient(90deg,#22c55e,#4ade80)'
+      : 'linear-gradient(90deg,#3b82f6,#6366f1)';
+}
+
+// ── QR Scanner ───────────────────────────────────────
+// Scan natif : le joueur utilise la caméra de son téléphone (Android/iOS).
+// Les QR codes encodent une URL complète (?found=ID) qui est détectée au chargement.
+
+// ── Compass ───────────────────────────────────────────
+function startCompassInterval() {
+  if (compassInterval) return;
+  updateCompass();
+  compassInterval = setInterval(updateCompass, 700);
+}
+function stopCompassInterval() {
+  if (compassInterval) { clearInterval(compassInterval); compassInterval = null; }
+}
+
+function updateCompass() {
+  if (activeTab !== 'explore') return;
+  if (playerLat === null || !treasures.length) return;
+
+  if (gameMap) {
+    const headingChanged = lastArrowHeading === null || Math.abs((deviceHeading || 0) - lastArrowHeading) > 5;
+    const posChanged = lastArrowLat === null || haversine(playerLat, playerLng, lastArrowLat, lastArrowLng) > 2;
+
+    if (posChanged || headingChanged) {
+      lastArrowLat = playerLat; lastArrowLng = playerLng; lastArrowHeading = deviceHeading || 0;
+
+      directionLayers.forEach(l => gameMap.removeLayer(l));
+      directionLayers = [];
+
+      if (compassArrowMode) {
+        const unfoundFixed = treasures
+          .filter(t => t.type === 'fixed' && !(t.found_by && t.found_by.split(',').includes(myPseudo)))
+          .map(t => ({ ...t, dist: haversine(playerLat, playerLng, t.lat, t.lng) }))
+          .sort((a, b) => a.dist - b.dist)
+          .slice(0, 3);
+
+        const arrowLen = 60;
+
+        unfoundFixed.forEach(t => {
+          const bearing = bearingTo(playerLat, playerLng, t.lat, t.lng);
+          const inRange = t.dist <= proximityR;
+          const color   = inRange ? '#22c55e' : t.dist < proximityR * 5 ? '#fbbf24' : '#60a5fa';
+          const distStr = t.dist < 1000 ? `${Math.round(t.dist)}m` : `${(t.dist/1000).toFixed(1)}km`;
+          const shortName = tLabel(t).length > 14 ? tLabel(t).slice(0, 13) + '…' : tLabel(t);
+          const arrowLabel = `${shortName} · ${distStr}`;
+
+          const tip   = destinationPoint(playerLat, playerLng, bearing, arrowLen);
+          const shaft = destinationPoint(playerLat, playerLng, bearing, arrowLen * 0.55);
+
+          const line = L.polyline([[playerLat, playerLng], tip], { color, weight: 3, opacity: 0.9 }).addTo(gameMap);
+
+          const arrowIcon = L.divIcon({
+            html: `<svg width="28" height="36" viewBox="0 0 28 36" xmlns="http://www.w3.org/2000/svg" style="transform:rotate(${bearing}deg);transform-origin:50% 75%;display:block">
+              <polygon points="14,0 22,20 14,15 6,20" fill="${color}" stroke="#0f172a" stroke-width="1.5"/>
+            </svg>`,
+            className: '', iconSize: [28, 36], iconAnchor: [14, 27]
+          });
+          const arrowMarker = L.marker(tip, { icon: arrowIcon, interactive: true, zIndexOffset: 500 }).addTo(gameMap);
+
+          // Popup with hint + photo on arrow click
+          const photos = getPhotoUrls(t.photo_url);
+          const photoHtml = photos.length
+            ? photos.map(safeImgUrl).filter(Boolean).map(u => `<img src="${escHtml(u)}" onclick="openPhotoViewer('${jsSingleQuoted(u)}')" style="width:100%;max-height:160px;object-fit:cover;border-radius:8px;margin-bottom:5px;display:block;cursor:zoom-in">`).join('')
+              + `<div style="font-size:0.72rem;color:#64748b;margin-bottom:6px">👆 Tap photo pour agrandir</div>`
+            : '';
+          const hintHtml = t.hint ? `<div style="font-size:0.8rem;color:#93c5fd;margin-top:4px">💡 ${escHtml(t.hint)}</div>` : '';
+          const inRangeHtml = inRange
+            ? `<button onclick="gameMap.closePopup();openQRScanner('${t.id.replace(/'/g,"\\'")}');" style="margin-top:8px;width:100%;padding:8px;background:linear-gradient(135deg,#22c55e,#16a34a);border:none;border-radius:8px;color:#fff;font-weight:700;cursor:pointer;font-size:0.85rem">� Scanner le QR !</button>`
+            : `<div style="font-size:0.75rem;color:#64748b;margin-top:6px;text-align:center">${distStr} — approche-toi</div>`;
+          const popupContent = `<div style="min-width:220px">${photoHtml}<b style="font-size:0.95rem">${escHtml(tLabel(t))}</b>${hintHtml}${inRangeHtml}</div>`;
+          arrowMarker.bindPopup(popupContent, { maxWidth: 280, className: 'dark-popup' });
+
+          const labelIcon = L.divIcon({
+            html: `<div style="background:rgba(15,23,42,.85);color:${color};font-size:0.68rem;font-weight:700;padding:2px 6px;border-radius:8px;border:1px solid ${color};white-space:nowrap;backdrop-filter:blur(4px)">${arrowLabel}</div>`,
+            className: '', iconSize: [60, 20], iconAnchor: [30, -4]
+          });
+          const labelMarker = L.marker(shaft, { icon: labelIcon, interactive: false, zIndexOffset: 501 }).addTo(gameMap);
+
+          directionLayers.push(line, arrowMarker, labelMarker);
+        });
+      }
+    }
+  }
+}
+
+// ── QR Scanner (photo native) ─────────────────────────
+let qrExpectedId = null;
+
+function openQRScanner(beaconId) {
+  qrExpectedId = beaconId || null;
+  const status = document.getElementById('qrStatus');
+  status.className = '';
+  status.textContent = 'Prends une photo du QR code pour valider la balise';
+  document.getElementById('qrPreviewWrap').style.display = 'none';
+  _resetQRInput();
+  document.getElementById('qrOverlay').classList.add('open');
+}
+
+function _resetQRInput() {
+  // Clone input to guarantee onchange fires even if same file is re-selected (iOS bug)
+  const old = document.getElementById('qrFileInput');
+  const fresh = document.createElement('input');
+  fresh.type = 'file';
+  fresh.accept = 'image/*';
+  fresh.setAttribute('capture', 'environment');
+  fresh.id = 'qrFileInput';
+  fresh.style.display = 'none';
+  fresh.addEventListener('change', () => handleQRPhoto(fresh));
+  old.parentNode.replaceChild(fresh, old);
+}
+
+async function handleQRPhoto(input) {
+  if (!input.files || !input.files[0]) return;
+  const status = document.getElementById('qrStatus');
+  status.className = '';
+  status.textContent = '🔍 Analyse en cours…';
+  document.getElementById('qrTips').style.display = 'none';
+
+  const file = input.files[0];
+  const url = URL.createObjectURL(file);
+
+  // Show preview
+  const previewImg = document.getElementById('qrPreviewImg');
+  previewImg.src = url;
+  document.getElementById('qrPreviewWrap').style.display = 'block';
+
+  const img = new Image();
+  img.onload = async () => {
+    try {
+      const canvas = document.getElementById('qrCanvas');
+      const ctx = canvas.getContext('2d', { willReadFrequently: true });
+      // Use a robust decoder that tries rotations and downscales
+      const decoded = await tryDecodeImageWithRetries(img, canvas, ctx);
+      URL.revokeObjectURL(url);
+      if (decoded) {
+        await _qrHandleResult(decoded);
+      } else {
+        status.textContent = '❌ QR non reconnu — réessaie en te rapprochant et en éclairant bien le QR';
+        status.className = 'qr-err';
+        haptic([80, 60, 80]);
+        document.getElementById('qrTips').style.display = 'block';
+        _resetQRInput(); // allow retrying immediately on iOS
+      }
+    } catch(err) {
+      URL.revokeObjectURL(url);
+      status.textContent = '❌ Erreur analyse — réessaie';
+      status.className = 'qr-err';
+      console.error('QR decode error:', err);
+      _resetQRInput();
+    }
+  };
+  img.onerror = () => {
+    URL.revokeObjectURL(url);
+    status.textContent = '❌ Impossible de lire l\'image';
+    status.className = 'qr-err';
+  };
+  img.src = url;
+}
+
+// Try decoding with multiple scales and rotations for higher robustness
+async function tryDecodeImageWithRetries(img, canvas, ctx) {
+  // Draw original to compute ratios
+  const maxDim = Math.max(img.width, img.height);
+  // List of scales to try (1 means full size, then smaller downscales)
+  const scales = maxDim > 1600 ? [1, 0.75, 0.5, 0.33] : [1, 0.66, 0.5];
+  const rotations = [0, 90, 180, 270];
+
+  for (const s of scales) {
+    const w = Math.round(img.width * s);
+    const h = Math.round(img.height * s);
+    canvas.width = w;
+    canvas.height = h;
+    // draw scaled
+    ctx.clearRect(0, 0, w, h);
+    ctx.drawImage(img, 0, 0, w, h);
+    // Try original orientation first
+    try {
+      const data = ctx.getImageData(0, 0, w, h);
+      const code = jsQR(data.data, data.width, data.height, { inversionAttempts: 'attemptBoth' });
+      if (code && code.data) return code.data;
+    } catch(e) { /* ignore */ }
+
+    // Try rotations by redrawing into temporary canvas
+    for (const deg of rotations) {
+      if (deg === 0) continue; // already tried
+      // rotate into canvas
+      const tmpW = deg % 180 === 0 ? w : h;
+      const tmpH = deg % 180 === 0 ? h : w;
+      canvas.width = tmpW;
+      canvas.height = tmpH;
+      ctx.save();
+      ctx.translate(tmpW / 2, tmpH / 2);
+      ctx.rotate((deg * Math.PI) / 180);
+      ctx.drawImage(img, -w / 2, -h / 2, w, h);
+      ctx.restore();
+      try {
+        const data2 = ctx.getImageData(0, 0, tmpW, tmpH);
+        const code2 = jsQR(data2.data, data2.width, data2.height, { inversionAttempts: 'attemptBoth' });
+        if (code2 && code2.data) return code2.data;
+      } catch(e) { /* ignore */ }
+    }
+  }
+  return null;
+}
+
+async function _qrHandleResult(raw) {
+  const status = document.getElementById('qrStatus');
+  const match  = raw.match(/[?&](?:checkin|found)=([^&\s]+)/);
+  if (!match) {
+    status.textContent = '⚠️ Ce QR n\'appartient pas au jeu — cherche le bon !';
+    status.className = 'qr-err';
+    haptic([80, 60, 80]);
+    return;
+  }
+  const scannedId = decodeURIComponent(match[1]);
+
+  if (qrExpectedId && scannedId !== qrExpectedId) {
+    status.textContent = '⚠️ Mauvaise balise — cherche le bon QR !';
+    status.className = 'qr-err';
+    haptic([80, 60, 80]);
+  } else {
+    status.textContent = '✅ Balise validée !';
+    status.className = 'qr-ok';
+    haptic([80, 40, 160]);
+    await new Promise(r => setTimeout(r, 400));
+    closeQRScanner();
+    await processFindById(scannedId);
+  }
+}
+
+function closeQRScanner() {
+  document.getElementById('qrOverlay').classList.remove('open');
+  qrExpectedId = null;
+}
+
+async function captureFixedById(id) {
+  openQRScanner(id);
+}
+
+function toggleCompassArrows() {
+  compassArrowMode = !compassArrowMode;
+  const btn = document.getElementById('arrowToggleBtn');
+  if (btn) {
+    btn.style.borderColor = compassArrowMode ? '#3b82f6' : '#334155';
+    btn.style.color       = compassArrowMode ? '#93c5fd' : '#94a3b8';
+    btn.style.background  = compassArrowMode ? 'rgba(30,58,138,.88)' : 'rgba(15,23,42,.88)';
+  }
+  // Clear and redraw immediately by resetting throttle
+  lastArrowLat = null; lastArrowLng = null; lastArrowHeading = null;
+  directionLayers.forEach(l => gameMap && gameMap.removeLayer(l));
+  directionLayers = [];
+  updateCompass();
+}
+
+function toggleCompassDebug() {
+  const el = document.getElementById('compassDebug');
+  const visible = el.style.display !== 'none';
+  if (visible) { el.style.display = 'none'; return; }
+  const allFixed = treasures.filter(t => t.type === 'fixed');
+  el.innerHTML = [
+    `GPS: ${playerLat !== null ? playerLat.toFixed(5)+', '+playerLng.toFixed(5) : '❌ null'}`,
+    `Heading: ${deviceHeading !== null ? Math.round(deviceHeading)+'°' : '❌ null'}`,
+    `Trésors total: ${treasures.length}`,
+    `Balises fixes: ${allFixed.length}`,
+    `activeTab: ${activeTab}`,
+    `compassInterval: ${compassInterval !== null ? '✅ actif' : '❌ null'}`,
+    `modeMap: ${modeMap} / modeCompass: ${modeCompass}`,
+    `myPseudo: ${myPseudo||'—'}`,
+  ].join('<br>');
+  el.style.display = 'block';
+}
+
+
+
+let _processingFind = false;
+
+async function processFindById(treasureId) {
+  if (_processingFind) return;
+  _processingFind = true;
+  try {
+    await _doProcessFind(treasureId);
+  } finally {
+    _processingFind = false;
+  }
+}
+
+async function _doProcessFind(treasureId) {
+  if (!myPseudo) { _checkinError('Mode invité: connecte-toi pour valider une balise.'); return; }
+  // Fetch treasure fresh from DB
+  const { data: t, error } = await db.from('treasures').select('*').eq('id', treasureId).single();
+  if (error || !t) { _checkinError('Trésor introuvable — il a peut-être été retiré.'); return; }
+  if (!t.visible)  { _checkinError('Ce trésor n\'est pas encore actif.'); return; }
+
+  // Check if already found by me
+  const foundList = (t.found_by || '').split(',').filter(Boolean);
+  if (foundList.includes(myPseudo)) { showFoundResult('already', t); return; }
+
+  // Unique: check if taken
+  if (t.type === 'unique' && foundList.length > 0) { showFoundResult('taken', t); return; }
+
+  // Calculate duration
+  // Calculate duration from max(placed_at, gameStart) to now
+  const refTime = gameStart && gameStart > new Date(t.placed_at) ? gameStart : new Date(t.placed_at);
+  const durationSec = Math.max(0, Math.round((Date.now() - refTime.getTime()) / 1000));
+
+  // Update treasure found_by
+  const newFoundBy = t.type === 'unique' ? myPseudo : [...foundList, myPseudo].join(',');
+  const updatePayload = { found_by: newFoundBy, found_at: new Date().toISOString() };
+  const updateQ = db.from('treasures').update(updatePayload).eq('id', t.id);
+  const { error: updateError, data: updatedRows } = t.type === 'unique'
+    ? await updateQ.eq('found_by', '').select('id')
+    : await updateQ.select('id');
+  if (updateError || !updatedRows || !updatedRows.length) {
+    if (t.type === 'unique') {
+      showFoundResult('taken', t);
+    } else {
+      _checkinError('Validation impossible pour le moment. Réessaie dans quelques secondes.');
+    }
+    return;
+  }
+
+  // Log event
+  await db.from('events').insert({ pseudo: myPseudo, treasure_id: t.id, treasure_type: t.type, duration_sec: durationSec });
+
+  // Update player score
+  myScore      += durationSec;
+  myFoundCount += 1;
+  await db.from('players').update({ score: myScore, found_count: myFoundCount }).eq('pseudo', myPseudo);
+
+  // Refresh local treasures
+  await loadTreasures();
+  renderMarkers();
+  updateHeader();
+  updateRadar();
+  updateProgressBar();
+
+  // Haptic feedback
+  if (navigator.vibrate) navigator.vibrate([80, 40, 160]);
+
+  showFoundResult('success', t, durationSec);
+}
+
+function showFoundResult(status, t, durationSec) {
+  const modal = document.getElementById('foundModal');
+  const emoji = document.getElementById('foundEmoji');
+  const title = document.getElementById('foundTitle');
+  const dur   = document.getElementById('foundDuration');
+  const desc  = document.getElementById('foundDesc');
+
+  // Show photos if available and found
+  const photoStrip = document.getElementById('foundPhotoStrip');
+  const photoSingle = document.getElementById('foundPhoto');
+  photoSingle.style.display = 'none';
+  if (status === 'success') {
+    const photos = getPhotoUrls(t.photo_url);
+    if (photos.length) {
+      photoStrip.innerHTML = photos.map(safeImgUrl).filter(Boolean).map(url => `<img src="${escHtml(url)}" style="width:100%;max-height:160px;object-fit:cover;border-radius:10px;margin-bottom:6px;display:block">`).join('');
+      photoStrip.style.display = 'block';
+    } else { photoStrip.style.display = 'none'; }
+  } else { photoStrip.style.display = 'none'; }
+
+  if (status === 'success') {
+    if (t.type === 'fixed') {
+      emoji.textContent = '✅';
+      title.textContent = `"${tLabel(t)}" capturée !`;
+      dur.textContent   = '';
+      // Compte combien de fixes il reste
+      const remaining = treasures.filter(tr =>
+        tr.type === 'fixed' &&
+        !(tr.found_by && tr.found_by.split(',').includes(myPseudo)) &&
+        tr.id !== t.id
+      ).length;
+      if (remaining > 0) {
+        desc.textContent = `Bravo ! Il te reste ${remaining} balise${remaining > 1 ? 's' : ''} fixe${remaining > 1 ? 's' : ''} à trouver. Continue !`;
+      } else {
+        // All fixed found — fetch reward message from config
+        desc.textContent = '🏆 Incroyable ! Tu as trouvé toutes les balises fixes !';
+        db.from('config').select('key,value').then(({ data: cfgData }) => {
+          if (!cfgData) return;
+          const cfg = Object.fromEntries(cfgData.map(r => [r.key, r.value]));
+          const msg = activeQuests.map(q => cfg['rewardMessage_'+q]).find(m => m) || cfg['rewardMessage'] || '';
+          if (msg) desc.innerHTML = `🏆 Tu as trouvé toutes les balises fixes !<br><br>📍 <strong>${escHtml(msg)}</strong>`;
+        });
+      }
+    } else {
+      emoji.textContent = '🎁';
+      title.textContent = `"${tLabel(t)}" trouvé !`;
+      dur.textContent   = formatDuration(durationSec);
+      desc.textContent  = 'Bravo ! Tu es le premier à l\'avoir récupéré.';
+    }
+  } else if (status === 'already') {
+    emoji.textContent = '🔄';
+    title.textContent = 'Déjà trouvé !';
+    dur.textContent   = '';
+    desc.textContent  = 'Tu as déjà scanné ce trésor.';
+  } else {
+    emoji.textContent = '🔒';
+    title.textContent = 'Trop tard !';
+    dur.textContent   = '';
+    desc.textContent  = 'Ce trésor unique a déjà été récupéré par quelqu\'un d\'autre.';
+  }
+  modal.classList.add('open');
+}
+
+function closeFound() { document.getElementById('foundModal').classList.remove('open'); }
+
+function openPhotoViewer(url) {
+  document.getElementById('photoViewerImg').src = url;
+  document.getElementById('photoViewer').classList.add('open');
+}
+function closePhotoViewer() {
+  document.getElementById('photoViewer').classList.remove('open');
+  document.getElementById('photoViewerImg').src = '';
+}
+
+function formatDuration(sec) {
+  if (sec < 60)   return `${sec}s`;
+  if (sec < 3600) return `${Math.floor(sec/60)}min ${sec%60}s`;
+  return `${Math.floor(sec/3600)}h ${Math.floor((sec%3600)/60)}min`;
+}
+
+// ── Leaderboard ──────────────────────────────────────
+async function loadLeaderboard() {
+  const el = document.getElementById('lbList');
+  el.innerHTML = `<p style="color:#475569;text-align:center;padding:30px">⏳ Chargement…</p>`;
+  let evRes, cfgRes;
+  try {
+    [evRes, cfgRes] = await Promise.all([
+      db.from('events').select('pseudo,treasure_id,treasure_type,duration_sec,created_at').order('created_at', { ascending: true }),
+      db.from('config').select('key,value')
+    ]);
+  } catch(netErr) {
+    el.innerHTML = `<p style="color:#f87171;text-align:center;padding:40px">⚠️ Erreur réseau : ${escHtml(netErr.message)}</p>`;
+    return;
+  }
+  if (evRes.error) {
+    el.innerHTML = `<p style="color:#f87171;text-align:center;padding:40px">⚠️ Erreur Supabase : ${escHtml(evRes.error.message)}</p>`;
+    return;
+  }
+  try {
+  const events = evRes.data || [];
+  const cfg    = Object.fromEntries((cfgRes.data || []).map(r => [r.key, r.value]));
+  const rewardMsg = (activeQuests || []).map(q => cfg['rewardMessage_'+q]).find(m => m) || cfg['rewardMessage'] || '';
+  const safeRewardMsg = escHtml(rewardMsg);
+  const totalFixed = parseInt(cfg.fixedTotal || fixedTotal || 0);
+
+  // Group events by player
+  const players = {};
+  events.forEach(e => {
+    if (!e.pseudo) return;
+    if (!players[e.pseudo]) players[e.pseudo] = { fixedEvents: [], uniqueEvents: [] };
+    if (e.treasure_type === 'fixed')  players[e.pseudo].fixedEvents.push(e);
+    if (e.treasure_type === 'unique') players[e.pseudo].uniqueEvents.push(e);
+  });
+
+  // Build rows — only players with at least 1 find
+  const rows = Object.entries(players)
+    .filter(([, d]) => d.fixedEvents.length > 0 || d.uniqueEvents.length > 0)
+    .map(([pseudo, d]) => {
+    const fixedCount = d.fixedEvents.length;
+    // Total time = last fixed timestamp - first fixed timestamp (only shown when all fixed done)
+    let fixedDuration = null;
+    if (d.fixedEvents.length >= 2) {
+      const times = d.fixedEvents.map(e => new Date(e.created_at).getTime()).sort((a,b) => a-b);
+      fixedDuration = Math.round((times[times.length-1] - times[0]) / 1000);
+    } else if (d.fixedEvents.length === 1) {
+      fixedDuration = 0;
+    }
+    const allFixed = fixedCount >= totalFixed && totalFixed > 0;
+    return { pseudo, fixedCount, fixedDuration, uniqueEvents: d.uniqueEvents, allFixed };
+  });
+
+  // Sort: most fixed desc, then shortest duration asc, then most uniques desc
+  rows.sort((a, b) => {
+    if (b.fixedCount !== a.fixedCount) return b.fixedCount - a.fixedCount;
+    if (a.fixedDuration !== null && b.fixedDuration !== null) return a.fixedDuration - b.fixedDuration;
+    if (a.fixedDuration !== null) return -1;
+    if (b.fixedDuration !== null) return 1;
+    return b.uniqueEvents.length - a.uniqueEvents.length;
+  });
+
+  const medals = ['🥇','🥈','🥉'];
+  const topClass = ['lb-top1','lb-top2','lb-top3'];
+
+  // ── My personal card ──
+  const myData = rows.find(p => p.pseudo === myPseudo);
+  const myRankNum = myData ? rows.indexOf(myData) + 1 : null;
+  const myCardEl = document.getElementById('myCard');
+  myCardEl.style.display = myPseudo ? 'block' : 'none';
+  if (myData) {
+    const pct = totalFixed > 0 ? Math.round((myData.fixedCount / totalFixed) * 100) : 0;
+    const rankLabel = myRankNum <= 3 ? medals[myRankNum-1] : `#${myRankNum}`;
+    const fillClass = myData.allFixed ? 'my-card-done' : 'my-card-fill';
+    const timeTxt = myData.allFixed && myData.fixedDuration !== null ? `⏱ ${formatDuration(myData.fixedDuration)}` : '';
+    const uniqTxt = myData.uniqueEvents.length ? `· ${myData.uniqueEvents.length} 🎁 trouvé${myData.uniqueEvents.length>1?'s':''}` : '';
+    const doneTxt = myData.allFixed ? '<span style="color:#4ade80;font-size:0.78rem;font-weight:700">✓ Toutes les balises fixes !</span>' : '';
+    const rewardTxt = myData.allFixed && rewardMsg ? `<div style="margin-top:8px;font-size:0.75rem;color:#4ade80;padding:6px 10px;background:#0d2218;border-radius:8px;border:1px solid #16a34a">📍 ${safeRewardMsg}</div>` : '';
+    myCardEl.innerHTML = `<div class="my-card">
+      <div class="my-card-rank">${rankLabel}</div>
+      <div class="my-card-pseudo">${escHtml(myPseudo)}</div>
+      <div class="my-card-sub">Ma progression</div>
+      <div class="my-card-stats">
+        <strong>${myData.fixedCount}${totalFixed?'/'+totalFixed:''} 📌</strong>
+        ${timeTxt ? `<span>${timeTxt}</span>` : ''}
+        ${uniqTxt ? `<span>${uniqTxt}</span>` : ''}
+        ${doneTxt}
+      </div>
+      ${totalFixed > 0 ? `<div class="my-card-bar"><div class="${fillClass}" style="width:${pct}%"></div></div>` : ''}
+      ${rewardTxt}
+    </div>`;
+  } else {
+    myCardEl.innerHTML = `<div class="my-card" style="text-align:center;padding:14px">
+      <div class="my-card-pseudo">${escHtml(myPseudo)}</div>
+      <div class="my-card-sub" style="margin-top:4px">Tu n'as pas encore trouvé de trésor — en avant !</div>
+    </div>`;
+  }
+
+
+  let html = '';
+  if (!rows.length) {
+    html = '<p style="color:#475569;text-align:center;padding:50px 20px">🏜 Pas encore de scores<br><span style="font-size:0.8rem">Sois le premier à trouver un trésor !</span></p>';
+  } else {
+    html += `<div class="lb-divider">🏆 Classement · ${rows.length} joueur${rows.length > 1 ? 's' : ''}</div>`;
+
+    // Find my rank
+    const myRank = rows.findIndex(p => p.pseudo === myPseudo);
+
+    rows.forEach((p, i) => {
+      // If > 10 players: show top 10 + separator + my row
+      const myRankInList = rows.findIndex(r => r.pseudo === myPseudo);
+      if (i >= 10 && i !== myRankInList) return;
+      if (i === 10 && myRankInList >= 10) html += `<div class="lb-you-sep">· · ·</div>`;
+
+      const isMe = p.pseudo === myPseudo;
+      const rankIcon = i < 3 ? medals[i] : `<span style="font-size:0.85rem;color:#475569;font-weight:700">${i+1}</span>`;
+      const extraClass = i < 3 ? topClass[i] : '';
+
+      // Progress bar
+      const pct = totalFixed > 0 ? Math.round((p.fixedCount / totalFixed) * 100) : 0;
+      const barColor = p.allFixed ? '#4ade80' : i === 0 ? '#fbbf24' : '#3b82f6';
+
+      // Time badge (only if all fixed done)
+      const timeBadge = p.allFixed && p.fixedDuration !== null
+        ? `<span class="lb-time">⏱ ${formatDuration(p.fixedDuration)}</span>`
+        : '';
+
+      // Unique badge
+      const uniqBadge = p.uniqueEvents.length
+        ? `<span class="lb-badge">🎁 ×${p.uniqueEvents.length}</span>`
+        : '';
+
+      // All done badge
+      const doneBadge = p.allFixed
+        ? `<span class="lb-badge lb-badge-done">✓ Toutes les balises</span>`
+        : '';
+
+      // Reward message (only for the player themselves if all done)
+      const rewardLine = p.allFixed && rewardMsg
+        ? `<div style="margin-top:5px;font-size:0.75rem;color:#4ade80;padding:5px 8px;background:#0d2218;border-radius:6px;border:1px solid #16a34a">📍 ${safeRewardMsg}</div>`
+        : '';
+
+      html += `<div class="lb-row${isMe ? ' lb-me' : ''}${extraClass ? ' '+extraClass : ''}">
+        <div class="lb-rank">${rankIcon}</div>
+        <div class="lb-body">
+          <div class="lb-name">${escHtml(p.pseudo)}</div>
+          <div class="lb-score">
+            <strong>${p.fixedCount}${totalFixed ? '/'+totalFixed : ''} 📌</strong>
+            ${timeBadge}${uniqBadge}${doneBadge}
+          </div>
+          ${totalFixed > 0 ? `<div class="lb-pbar"><div class="lb-pfill" style="width:${pct}%;background:${barColor}"></div></div>` : ''}
+          ${rewardLine}
+        </div>
+      </div>`;
+    });
+  }
+
+  document.getElementById('lbList').innerHTML = html;
+  document.getElementById('lbRefresh').textContent = '↻ ' + new Date().toLocaleTimeString('fr-FR', { hour:'2-digit', minute:'2-digit', second:'2-digit' });
+  } catch(renderErr) {
+    el.innerHTML = `<p style="color:#f87171;text-align:center;padding:40px">⚠️ Erreur rendu : ${escHtml(renderErr.message)}</p>`;
+    console.error('loadLeaderboard error:', renderErr);
+  }
+}
+
+function startLbPolling() {
+  loadLeaderboard();
+  lbInterval = setInterval(loadLeaderboard, 10000);
+}
+
+// ── Tabs ─────────────────────────────────────────────
+function showTab(name, btn) {
+  activeTab = name;
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('nav button').forEach(b => b.classList.remove('active'));
+  document.getElementById('panel' + name.charAt(0).toUpperCase() + name.slice(1)).classList.add('active');
+  if (btn) btn.classList.add('active');
+  if (name === 'explore') {
+    setTimeout(() => gameMap && gameMap.invalidateSize(), 60);
+    startCompassInterval();
+    updateRadar();
+  } else if (name === 'scores') {
+    stopCompassInterval();
+    document.getElementById('captureFab').style.display = 'none';
+    directionLayers.forEach(l => gameMap && gameMap.removeLayer(l));
+    directionLayers = [];
+    loadLeaderboard();
+  } else {
+    stopCompassInterval();
+    document.getElementById('captureFab').style.display = 'none';
+    directionLayers.forEach(l => gameMap && gameMap.removeLayer(l));
+    directionLayers = [];
+  }
+}
+
+// ── Pause ────────────────────────────────────────────
+function showPause() { document.getElementById('pauseScreen').classList.add('open'); }
+
+// ── Periodic refresh (treasures + config) ────────────
+setInterval(async () => {
+  const { data: cfg } = await db.from('config').select('*');
+  if (cfg) {
+    const c = Object.fromEntries(cfg.map(r => [r.key, r.value]));
+    if (c.gameActive === 'false') showPause();
+    else document.getElementById('pauseScreen').classList.remove('open');
+    if (c.proximityRadius) proximityR = Number(c.proximityRadius);
+  }
+  await loadTreasures();
+  renderMarkers();
+  updateRadar();
+  updateProgressBar();
+}, 15000);
+</script>
+</body>
+</html>
