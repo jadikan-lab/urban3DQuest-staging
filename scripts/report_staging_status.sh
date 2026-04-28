@@ -4,6 +4,8 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 cd "$ROOT_DIR"
 
+"$ROOT_DIR/scripts/guard_staging_project.sh"
+
 echo "=== STAGING STATUS REPORT ==="
 echo "Date: $(date -u +"%Y-%m-%d %H:%M:%S UTC")"
 echo
