@@ -1,0 +1,3 @@
+supabase/.temp/
+backups/*.sql
+backups/*.csv
