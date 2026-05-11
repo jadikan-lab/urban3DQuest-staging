@@ -275,8 +275,9 @@
       <option value="">Toutes les quêtes</option>
     </select>
     <button class="btn" onclick="generateFixedQRCodes()" style="background:#166534;border:1px solid #4ade80">⚡ Générer les QR balises fixes</button>
-    <button class="btn" id="zipFixedPngBtn" style="background:#1e293b;border:1px solid #334155;display:none" onclick="downloadFixedQrZip('png')">⬇ Télécharger ZIP PNG (400px)</button>
-    <button class="btn" id="zipFixedSvgBtn" style="background:#0f172a;border:1px solid #475569;display:none" onclick="downloadFixedQrZip('svg')">⬇ Télécharger ZIP SVG (Fusion 360)</button>
+    <button class="btn" id="zipFixedPngBtn" style="background:#1e293b;border:1px solid #334155" onclick="downloadFixedQrZip('png')" disabled>⬇ Télécharger ZIP PNG (400px)</button>
+    <button class="btn" id="zipFixedSvgBtn" style="background:#0f172a;border:1px solid #475569" onclick="downloadFixedQrZip('svg')" disabled>⬇ Télécharger ZIP SVG (Fusion 360)</button>
+    <p style="font-size:0.72rem;color:#94a3b8;margin-top:6px">Conseil: SVG est vectoriel (idéal Fusion 360 / impression 3D), PNG est pratique pour impression rapide.</p>
     <p id="fixedQrInfo" style="font-size:0.75rem;color:#475569;margin-top:8px;display:none"></p>
     <div id="fixedQrGrid" class="qr-grid" style="margin-top:12px"></div>
   </div>
@@ -308,8 +309,9 @@
     <input type="text" id="qrNewObjet" placeholder="ex: statuette bleue, carte postale…" style="width:100%;box-sizing:border-box">
   </div>
   <button class="btn" onclick="generateQRCodes()">⚡ Générer</button>
-  <button class="btn" id="zipPngBtn" style="background:#1e293b;border:1px solid #334155;display:none" onclick="downloadQrZip('png')">⬇ Télécharger ZIP PNG (400px · Photoshop)</button>
-  <button class="btn" id="zipSvgBtn" style="background:#0f172a;border:1px solid #475569;display:none" onclick="downloadQrZip('svg')">⬇ Télécharger ZIP SVG (Fusion 360)</button>
+  <button class="btn" id="zipPngBtn" style="background:#1e293b;border:1px solid #334155" onclick="downloadQrZip('png')" disabled>⬇ Télécharger ZIP PNG (400px · Photoshop)</button>
+  <button class="btn" id="zipSvgBtn" style="background:#0f172a;border:1px solid #475569" onclick="downloadQrZip('svg')" disabled>⬇ Télécharger ZIP SVG (Fusion 360)</button>
+  <p style="font-size:0.72rem;color:#94a3b8;margin-top:6px">Bon format: SVG pour découpe/CAO, PNG pour affichage écran et impression bureautique.</p>
   <p id="qrInfo" style="font-size:0.75rem;color:#475569;margin-bottom:12px;display:none"></p>
   <div id="qrGrid" class="qr-grid"></div>
   </div>
@@ -592,6 +594,8 @@ function buildQrAsset(url,label,level,format,opts){
 async function generateFixedQRCodes(){
   var grid=document.getElementById('fixedQrGrid');
   var info=document.getElementById('fixedQrInfo');
+  document.getElementById('zipFixedPngBtn').disabled=true;
+  document.getElementById('zipFixedSvgBtn').disabled=true;
   grid.innerHTML='<p style="color:#475569;font-size:0.8rem">Chargement…</p>';
   info.style.display='none';
   var questFilter=document.getElementById('filterQuestQr')?document.getElementById('filterQuestQr').value:'';
@@ -620,8 +624,8 @@ async function generateFixedQRCodes(){
   var foundCount=res.data.filter(function(t){return t.found_by&&t.found_by.length>0;}).length;
   info.innerHTML=total+' balises — <span style="color:#4ade80">'+(total-foundCount)+' à poser</span>'+(foundCount?', <span style="color:#f97316">'+foundCount+' déjà trouvées 🎯</span>':'');
   info.style.display='block';
-  document.getElementById('zipFixedPngBtn').style.display='block';
-  document.getElementById('zipFixedSvgBtn').style.display='block';
+  document.getElementById('zipFixedPngBtn').disabled=false;
+  document.getElementById('zipFixedSvgBtn').disabled=false;
 }
 async function downloadFixedQrZip(format){
   var fmt=(format==='svg')?'svg':'png';
@@ -686,8 +690,8 @@ function generateQRCodes(){
   var info=document.getElementById('qrInfo');
   info.textContent=count+' codes générés — '+prefix+'-'+String(start).padStart(3,'0')+' → '+prefix+'-'+String(start+count-1).padStart(3,'0')+(quest?' · quête '+quest:'')+(objet?' · '+objet:'')+' · Télécharge le ZIP';
   info.style.display='block';
-  document.getElementById('zipPngBtn').style.display='block';
-  document.getElementById('zipSvgBtn').style.display='block';
+  document.getElementById('zipPngBtn').disabled=false;
+  document.getElementById('zipSvgBtn').disabled=false;
   localStorage.setItem('u3dq_qr_generated', JSON.stringify(generatedIds));
   localStorage.setItem('u3dq_qr_meta', JSON.stringify(meta));
 }
@@ -702,7 +706,7 @@ function editQrMeta(id){
   localStorage.setItem('u3dq_qr_meta', JSON.stringify(meta));
   restoreQrGrid();
 }
-async function restoreQrGrid(){var ids=JSON.parse(localStorage.getItem('u3dq_qr_generated')||'[]');var meta=JSON.parse(localStorage.getItem('u3dq_qr_meta')||'{}');var grid=document.getElementById('qrGrid');grid.innerHTML='';if(!ids.length){document.getElementById('qrInfo').style.display='none';document.getElementById('zipPngBtn').style.display='none';document.getElementById('zipSvgBtn').style.display='none';return;}var res=await db.from('treasures').select('id,found_by');var tMap={};(res.data||[]).forEach(function(t){tMap[t.id]=t.found_by;});ids.forEach(function(id){var sid='qrs_r_'+id.replace(/[^a-z0-9]/gi,'_');var placed=id in tMap;var found=placed&&tMap[id]&&tMap[id].length>0;var borderColor=found?'#f97316':placed?'#4ade80':'transparent';var labelColor=found?'#f97316':placed?'#4ade80':'#93c5fd';var badge=found?' 🎯':placed?' ✓':'';var m=meta[id]||{};var qBadge=m.quest?'<span style="background:#1c3351;color:#7dd3fc;font-size:0.6rem;font-weight:600;padding:1px 5px;border-radius:6px;margin-left:3px">'+m.quest+'</span>':'';var oBadge=m.objet?'<div style="font-size:0.62rem;color:#94a3b8;margin-top:2px">&#128230; '+m.objet+'</div>':'';var card=document.createElement('div');card.className='qr-card';card.id='qrc_'+id.replace(/[^a-z0-9]/gi,'_');card.style.opacity=found?'0.35':placed?'0.55':'1';card.style.border='2px solid '+borderColor;card.style.borderRadius='10px';card.style.position='relative';card.innerHTML='<div class="qr-card-id" style="color:'+labelColor+'">'+id+badge+qBadge+'</div>'+oBadge+'<div id="'+sid+'"></div>'+'<button onclick="editQrMeta(\''+id+'\')" style="margin-top:4px;width:100%;padding:3px;background:#0f172a;border:1px solid #334155;border-radius:6px;color:#94a3b8;font-size:0.65rem;cursor:pointer">&#9999;&#65039; Modifier</button>';grid.appendChild(card);var url=GAME_BASE_URL+'/?found='+id;new QRCode(document.getElementById(sid),{text:url,width:150,height:150,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.L});});var total=ids.length;var placedCount=ids.filter(function(id){return id in tMap;}).length;var foundCount=ids.filter(function(id){return tMap[id]&&tMap[id].length>0;}).length;var info=document.getElementById('qrInfo');info.innerHTML=total+' codes — <span style="color:#4ade80">'+placedCount+' posés ✓</span>, <span style="color:#f97316">'+foundCount+' trouvés 🎯</span>, '+(total-placedCount)+' disponibles';info.style.display='block';document.getElementById('zipPngBtn').style.display='block';document.getElementById('zipSvgBtn').style.display='block';}
+async function restoreQrGrid(){var ids=JSON.parse(localStorage.getItem('u3dq_qr_generated')||'[]');var meta=JSON.parse(localStorage.getItem('u3dq_qr_meta')||'{}');var grid=document.getElementById('qrGrid');grid.innerHTML='';if(!ids.length){document.getElementById('qrInfo').style.display='none';document.getElementById('zipPngBtn').disabled=true;document.getElementById('zipSvgBtn').disabled=true;return;}var res=await db.from('treasures').select('id,found_by');var tMap={};(res.data||[]).forEach(function(t){tMap[t.id]=t.found_by;});ids.forEach(function(id){var sid='qrs_r_'+id.replace(/[^a-z0-9]/gi,'_');var placed=id in tMap;var found=placed&&tMap[id]&&tMap[id].length>0;var borderColor=found?'#f97316':placed?'#4ade80':'transparent';var labelColor=found?'#f97316':placed?'#4ade80':'#93c5fd';var badge=found?' 🎯':placed?' ✓':'';var m=meta[id]||{};var qBadge=m.quest?'<span style="background:#1c3351;color:#7dd3fc;font-size:0.6rem;font-weight:600;padding:1px 5px;border-radius:6px;margin-left:3px">'+m.quest+'</span>':'';var oBadge=m.objet?'<div style="font-size:0.62rem;color:#94a3b8;margin-top:2px">&#128230; '+m.objet+'</div>':'';var card=document.createElement('div');card.className='qr-card';card.id='qrc_'+id.replace(/[^a-z0-9]/gi,'_');card.style.opacity=found?'0.35':placed?'0.55':'1';card.style.border='2px solid '+borderColor;card.style.borderRadius='10px';card.style.position='relative';card.innerHTML='<div class="qr-card-id" style="color:'+labelColor+'">'+id+badge+qBadge+'</div>'+oBadge+'<div id="'+sid+'"></div>'+'<button onclick="editQrMeta(\''+id+'\')" style="margin-top:4px;width:100%;padding:3px;background:#0f172a;border:1px solid #334155;border-radius:6px;color:#94a3b8;font-size:0.65rem;cursor:pointer">&#9999;&#65039; Modifier</button>';grid.appendChild(card);var url=GAME_BASE_URL+'/?found='+id;new QRCode(document.getElementById(sid),{text:url,width:150,height:150,colorDark:'#000000',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.L});});var total=ids.length;var placedCount=ids.filter(function(id){return id in tMap;}).length;var foundCount=ids.filter(function(id){return tMap[id]&&tMap[id].length>0;}).length;var info=document.getElementById('qrInfo');info.innerHTML=total+' codes — <span style="color:#4ade80">'+placedCount+' posés ✓</span>, <span style="color:#f97316">'+foundCount+' trouvés 🎯</span>, '+(total-placedCount)+' disponibles';info.style.display='block';document.getElementById('zipPngBtn').disabled=false;document.getElementById('zipSvgBtn').disabled=false;}
 async function downloadQrZip(format){var fmt=(format==='svg')?'svg':'png';var btn=document.getElementById(fmt==='svg'?'zipSvgBtn':'zipPngBtn');var ids=JSON.parse(localStorage.getItem('u3dq_qr_generated')||'[]');if(!ids.length){alert('Générez d\'abord les QR codes.');return;}btn.disabled=true;btn.textContent='⏳ Création du ZIP '+fmt.toUpperCase()+' ('+ids.length+' fichiers)…';var res=await db.from('treasures').select('id,label');var labelMap={};(res.data||[]).forEach(function(t){labelMap[t.id]=t.label||'';});var zip=new JSZip();var QR_SZ=400;var PAD=56;ids.forEach(function(id){var url=GAME_BASE_URL+'/?found='+id;var lbl=labelMap[id]||'';var payload=buildQrAsset(url,lbl?id+' · '+lbl.substring(0,28):id,QRCode.CorrectLevel.L,fmt,{size:QR_SZ,bottomPad:PAD});if(payload){var ext=(fmt==='svg')?'svg':'png';zip.file(id+'.'+ext,payload,fmt==='svg'?{}:{base64:true});}});var blob=await zip.generateAsync({type:'blob',compression:'DEFLATE',compressionOptions:{level:6}});var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='urban3dquest_qrcodes_'+fmt+'.zip';document.body.appendChild(a);a.click();document.body.removeChild(a);btn.disabled=false;btn.textContent=fmt==='svg'?'⬇ Télécharger ZIP SVG (Fusion 360)':'⬇ Télécharger ZIP PNG (400px · Photoshop)';}
 async function loadQrLov(){var generated=JSON.parse(localStorage.getItem('u3dq_qr_generated')||'[]');var sel=document.getElementById('fQrSelect');var info=document.getElementById('fQrInfo');sel.innerHTML='<option value="">— Aucun QR (ID auto) —</option>';var manOpt=document.createElement('option');manOpt.value='__manual__';manOpt.textContent='✏️ Saisir manuellement';sel.appendChild(manOpt);if(!generated.length){info.textContent='Aucun QR généré — allez dans l\'onglet QR pour en créer';info.style.color='#fb923c';return;}var res=await db.from('treasures').select('id');var used=new Set((res.data||[]).map(function(t){return t.id;}));var available=generated.filter(function(id){return!used.has(id);});var metaLov=JSON.parse(localStorage.getItem('u3dq_qr_meta')||'{}');available.forEach(function(id,idx){var opt=document.createElement('option');opt.value=id;var m=metaLov[id]||{};var suffix=(m.quest?' ['+m.quest+']':'')+(m.objet?' — '+m.objet:'');opt.textContent=(idx===0?'⬆ PROCHAIN : ':'')+id+suffix;sel.appendChild(opt);});var total=generated.length;info.textContent=available.length+' QR disponibles sur '+total+' générés'+(available.length===0?' — tous déjà posés':'');info.style.color=available.length===0?'#fb923c':'#475569';if(available.length>0){sel.value=available[0];document.getElementById('fQrNum').style.display='none';}}
 function onQrSelectChange(){var v=document.getElementById('fQrSelect').value;var inp=document.getElementById('fQrNum');if(v==='__manual__'){inp.style.display='block';inp.focus();}else{inp.style.display='none';inp.value=v;}}
