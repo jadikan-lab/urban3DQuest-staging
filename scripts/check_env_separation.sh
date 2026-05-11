@@ -6,7 +6,14 @@ STG_DIR="/Users/guilhemnicolas/Documents/PlatformIO/Projects/urban3DQuest-stagin
 
 extract_ref() {
   local file="$1"
-  grep -E "SUPABASE_URL" "$file" | head -n 1 | sed -E "s/.*https:\/\/([a-z0-9]+)\.supabase\.co.*/\1/"
+  # Multi-env pattern: extract URL from prod: block (e.g. SUPABASE_ENVS = { prod: { url: '...' } })
+  local ref
+  ref=$(grep -A5 -E "^\s*prod[:{]" "$file" | grep -oE "https://[a-z0-9]+\.supabase\.co" | head -1 | sed -E "s/https:\/\/([a-z0-9]+)\.supabase\.co/\1/")
+  if [[ -z "$ref" ]]; then
+    # Fallback: single-env pattern (SUPABASE_URL = 'https://...')
+    ref=$(grep -oE "https://[a-z0-9]+\.supabase\.co" "$file" | head -1 | sed -E "s/https:\/\/([a-z0-9]+)\.supabase\.co/\1/")
+  fi
+  echo "$ref"
 }
 
 PROD_REF_1="$(extract_ref "$PROD_DIR/index.html")"
